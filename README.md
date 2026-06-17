@@ -1,13 +1,14 @@
-# 🧢 OpenCode Kit
+# 🧢 proyecto-opencode-mem
 
 > **Estado:** 🟢 Pre-runtime — kit de componentes para armar tu configuración de OpenCode.
 > **Versión:** 0.1.0 (Phase 1) — Documentación fundacional.
+> **Phase 1:** ✅ Completada — Phase 1.1: ✅ Completada
 
 [![Experimental](https://img.shields.io/badge/estado-experimental-yellow)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](#)
-[![Validate](https://github.com/harry/opencode-kit/actions/workflows/validate.yml/badge.svg)](.#)
+[![Validate](https://github.com/harrysxavio/proyecto-opencode-mem/actions/workflows/validate.yml/badge.svg)](.#)
 
-**OpenCode Kit** es un conjunto portable de componentes, configuraciones, agentes SDD,
+**proyecto-opencode-mem** (OpenCode Kit) es un conjunto portable de componentes, configuraciones, agentes SDD,
 scripts de validación y documentación que te permite construir tu propio entorno OpenCode
 — ya sea desde cero, migrando desde otra herramienta, o expandiendo uno existente.
 
@@ -201,8 +202,12 @@ completo de Engram.
 
 ## Ponytail Code Gate — Código mínimo, sin sobreingeniería
 
-**Ponytail** es una guarda de calidad que reduce el código innecesario. Antes de
-escribir cualquier implementación, Ponytail pregunta:
+**Ponytail** es una guarda de calidad conceptual para reducir código innecesario.
+En este repo, Ponytail está disponible como **guidance/template** para que el
+Manager lo aplique en tareas de código. No es un plugin instalable ni un runtime
+que se active solo.
+
+Las preguntas que guían a Ponytail:
 
 1. **¿Esto necesita existir?** — Tal vez se puede eliminar directamente.
 2. **¿La stdlib lo hace?** — Preferí la biblioteca estándar.
@@ -213,41 +218,47 @@ escribir cualquier implementación, Ponytail pregunta:
 > ⚠️ Ponytail **nunca simplifica** seguridad, validación, accesibilidad, manejo de
 > errores críticos, o tests requeridos. Solo elimina sobreingeniería.
 
-### Cuándo se activa
+### Cómo se aplica
 
-Ponytail se aplica automáticamente cuando la tarea involucra:
+Ponytail **no se instala como plugin por defecto**. Su aplicación es conceptual:
+
+- El Manager lo usa como guía durante tareas de código.
+- Los templates SDD incluyen referencias a Ponytail como recordatorio.
+- No hay enforcement runtime automático.
+- No hay skills Ponytail precargados.
+- No está activo en modo *ultra* por defecto.
+
+Se aplica como criterio de diseño cuando la tarea involucra:
 
 - Crear o modificar código
 - Refactorizar
 - Revisar un diff
 - Agregar una nueva abstracción o dependencia
 
-No se aplica cuando la tarea es solo documentación, discusión de arquitectura, o
-planificación.
-
-> 📘 Ponytail está integrado como protocolo en el Manager y en los templates SDD.
-> No es un plugin instalable. Es una guía de estilo de código que el Manager sigue.
+> 📘 Ponytail está documentado como protocolo en los templates del Manager y SDD.
+> Es una guía de estilo, no un plugin que se active al instalar el kit.
 
 ---
 
 ## gentle-ai — Directivas de alineación
 
-**gentle-ai** es un conjunto de directivas que el asistente de IA debe seguir en
-cada interacción. No es un runtime ni un plugin. Es un **protocolo de comportamiento**
-escrito en los archivos de configuración.
+**gentle-ai** se trata como **alignment-only**: una referencia conceptual y
+documental para evaluación, arquitectura y comportamiento esperado del asistente.
+No es un runtime ni un plugin. No se instala como dependencia. No se incluye
+en el perfil `full`. No se invoca automáticamente.
 
-Las directivas cubren:
+Lo que gentle-ai provee:
 
-- **Persona del asistente** — arquitecto senior de 15 años de experiencia, apasionado
-  por enseñar.
-- **Reglas de respuesta** — longitud mínima, una pregunta por vez, verificar antes
-  de afirmar.
-- **Protocolo de memoria** — Engram, guardado proactivo, búsqueda al empezar.
-- **Integración de skills** — carga contextual de skills cuando el usuario menciona
-  temas que disparan un skill.
+- **Directrices de persona** — describe cómo debería comportarse un asistente
+  ideal (arquitecto senior, didáctico, directo).
+- **Reglas de respuesta** — longitud mínima, una pregunta por vez, verificar
+  antes de afirmar.
+- **Protocolo de memoria** — referencia a Engram para persistencia.
+- **Integración de skills** — referencia a carga contextual.
 
-> 📘 Las directivas están en el archivo `AGENTS.md` de la configuración de OpenCode.
-> El kit provee un template de ejemplo en `templates/AGENTS.example.md`.
+> 📘 gentle-ai es **alignment-only**: puede inspirar decisiones y patrones, pero
+> no hay runtime que lo ejecute. Está documentado en `templates/AGENTS.example.md`
+> como referencia, no como sistema activo.
 
 ---
 
@@ -282,8 +293,8 @@ En 3 pasos tenés tu configuración lista:
 
 ```bash
 # 1. Cloná el repositorio
-git clone https://github.com/tu-usuario/opencode-kit.git
-cd opencode-kit
+git clone https://github.com/harrysxavio/proyecto-opencode-mem.git
+cd proyecto-opencode-mem
 
 # 2. Instalá las dependencias
 pnpm install
@@ -301,12 +312,34 @@ pnpm doctor
 # Revisá que no haya caminos absolutos ni secretos
 pnpm sanitize:check
 
-# Probá una instalación dry-run con el perfil full
+# Simulá una instalación dry-run con el perfil full
 pnpm install:dry-run --profile full
 ```
 
 > 💡 Los comandos `install:*` son dry-run y temp — no modifican tu sistema. Te
 > muestran qué archivos se copiarían y dónde.
+
+### ✅ Qué puedes hacer hoy
+
+- Clonar el repositorio y explorar el código.
+- Instalar dependencias (`pnpm install`).
+- Validar la estructura del kit (`pnpm validate`).
+- Diagnosticar tu entorno (`pnpm doctor`).
+- Revisar que no haya secretos ni caminos absolutos (`pnpm sanitize:check`).
+- Simular una instalación dry-run (`pnpm install:dry-run --profile full`).
+- Probar una instalación temporal en `tests/tmp/` (`pnpm install:temp`).
+- Leer los perfiles y elegir el que mejor se adapte a tu necesidad.
+- Leer toda la documentación y entender cada componente.
+
+### ❌ Qué todavía NO puedes hacer
+
+- ~~Instalar automáticamente en tu OpenCode real~~ — el kit no tiene installer real.
+- ~~Usar un installer real con backup/rollback ejecutable~~ — solo existen `backup:plan` y `rollback:plan`.
+- ~~Copiar DB o memorias~~ — Engram es conceptual, no hay DB real.
+- ~~Asumir soporte Codex actual~~ — Codex no es un destino soportado en Phase 1.
+- ~~Asumir Ponytail plugin instalado~~ — Ponytail es guidance/template, no plugin.
+- ~~Asumir gentle-ai runtime activo~~ — gentle-ai es alignment-only.
+- ~~Usar un instalador que toque archivos fuera del repo~~ — no existe.
 
 ---
 
@@ -338,7 +371,9 @@ OpenCode Kit incluye varias capas de seguridad:
   y consistencia del manifest.
 - **Doctor** (`pnpm doctor`) — diagnóstico del entorno Node.js, pnpm, y Git.
 - **Dry-run** (`pnpm install:dry-run`) — muestra qué se copiaría sin tocar nada.
-- **Rollback** (`pnpm rollback`) — si algo sale mal, restaura el estado anterior.
+- **Rollback plan** (`pnpm rollback:plan`) — muestra qué se restauraría (plan-only,
+  no ejecuta rollback real).
+- **Backup plan** (`pnpm backup:plan`) — muestra qué se respaldaría (plan-only).
 
 > 📘 La guía completa está en [`docs/safety-and-sanitization.md`](docs/safety-and-sanitization.md).
 
@@ -357,9 +392,10 @@ OpenCode Kit evoluciona en 5 fases. Cada fase agrega capacidades sin romper lo
 anterior.
 
 | Fase | Estado | Qué agrega |
-|---|---|---|
+|---|---|---|---|
 | **Phase 0** — Bootstrap | ✅ Completada | Estructura base, manifest, perfiles, scripts de validación |
-| **Phase 1** — Install UX & Docs | 🔄 En curso | README en español, guías, audit, documentación completa |
+| **Phase 1** — Install UX & Docs | ✅ Completada | README en español, guías, audit, documentación completa |
+| **Phase 1.1** — Documentation Accuracy | ✅ Completada | Corrección de placeholders, claims, consistencia |
 | **Phase 2** — Componentes portables | 📅 Futura | Componentes independientes, registro distribuido |
 | **Phase 3** — Agentes exportables | 📅 Futura | Agentes pre-armados exportables como skills |
 | **Phase 4** — Ecosistema | 📅 Futura | Marketplace de componentes, comunidad, CI/CD |
@@ -434,10 +470,10 @@ más detalles.
 ## Compatibilidad con OpenCode
 
 | Versión de OpenCode | Compatibilidad |
-|---|---|
-| 1.0.x | ✅ Compatible |
-| 1.1.x | ✅ Compatible |
-| 1.2.x | ✅ Compatible (probada) |
+|---|---|---|
+| 1.0.x | ✅ Esperada (validada por templates) |
+| 1.1.x | ✅ Esperada (validada por templates) |
+| 1.2.x | 🟡 Pendiente de prueba cross-machine |
 | 2.x (futura) | ⚠️ No probada, pero los componentes son independientes y deberían funcionar. |
 
 > 📘 El kit usa APIs estándar de OpenCode (configuración por archivos, AGENTS.md,
@@ -447,12 +483,12 @@ más detalles.
 
 ## Desinstalación
 
-Para "desinstalar" OpenCode Kit:
+Para "desinstalar" proyecto-opencode-mem:
 
 1. **Si solo copiaste archivos:** borrá los archivos que copiaste de la carpeta de
    configuración de OpenCode.
 2. **Si usaste `install:temp`:** borrá la carpeta temporal que se creó.
-3. **El repositorio:** borralo con `rm -rf opencode-kit` (o `Remove-Item` en Windows).
+3. **El repositorio:** borralo con `rm -rf proyecto-opencode-mem` (o `Remove-Item` en Windows).
 
 No hay scripts de desinstalación porque el kit nunca modifica archivos fuera de su
 directorio sin que vos lo copies explícitamente.
@@ -489,9 +525,8 @@ Todos los archivos del kit están en sus directorios. Si falta alguno, ejecutá
 
 ## Comunidad y soporte
 
-- **Issues y bugs:** [GitHub Issues](https://github.com/tu-usuario/opencode-kit/issues)
-- **Discusiones:** [GitHub Discussions](https://github.com/tu-usuario/opencode-kit/discussions)
-- **Pull requests:** Bienvenidos — revisá [CONTRIBUTING.md](CONTRIBUTING.md) antes.
+- **Issues y bugs:** [GitHub Issues](https://github.com/harrysxavio/proyecto-opencode-mem/issues) (o abrí uno si no existe)
+- **Pull requests:** Bienvenidos — revisá la sección [Contribuir](#contribuir) antes.
 
 > 💡 Este es un proyecto personal mantenido en tiempo libre. Los tiempos de
 > respuesta pueden variar.

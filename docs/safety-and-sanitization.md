@@ -13,7 +13,7 @@ OpenCode Kit sigue estos principios:
 2. **Verificar antes de copiar.** Los scripts de sanitización corren antes que
    cualquier instalación.
 3. **Ser transparente.** Cada script muestra exactamente qué va a hacer.
-4. **Poder volver atrás.** Siempre hay un comando de rollback disponible.
+4. **Poder volver atrás.** Hay un comando de plan de rollback (`rollback:plan`) que muestra qué se restauraría (plan-only, no ejecuta rollback real).
 
 ---
 
@@ -166,7 +166,7 @@ pnpm install:dry-run --profile minimal
 > Guarda una copia del estado actual antes de hacer cambios.
 
 ```bash
-pnpm backup
+pnpm backup:plan
 ```
 
 ### Qué guarda
@@ -193,20 +193,23 @@ backups/
 > Restaura el estado anterior si algo sale mal.
 
 ```bash
-pnpm rollback
+pnpm rollback:plan
 ```
 
-### Cómo funciona
+### Cómo funciona (plan-only)
+
+`pnpm rollback:plan` **muestra** qué archivos se restaurarían, pero **no ejecuta**
+la restauración. Es un plan de contingencia.
 
 1. Busca el último backup disponible.
 2. Te muestra qué se va a restaurar.
-3. Pide confirmación.
-4. Restaura los archivos.
-5. Verifica que la restauración sea correcta.
+3. Pide confirmación (simulada).
+4. Muestra el plan de restauración.
+5. No modifica archivos realmente.
 
 ### Limitaciones
 
-- Solo restaura archivos que fueron respaldados con `pnpm backup`.
+- Solo restaura archivos que fueron respaldados con `pnpm backup:plan` (plan-only).
 - No puede restaurar cambios que no fueron respaldados.
 - Si no hay backups, el comando avisa y no hace nada.
 
@@ -219,7 +222,7 @@ pnpm rollback
 1. **Corré `pnpm doctor` al empezar** — conocé el estado del entorno.
 2. **Corré `pnpm sanitize:check` antes de distribuir** — no compartas secretos.
 3. **Usá `install:dry-run` siempre primero** — nunca copies archivos sin simulacro.
-4. **Hacé backup antes de cambios grandes** — `pnpm backup` es rápido.
+4. **Hacé backup antes de cambios grandes** — `pnpm backup:plan` es rápido.
 5. **Verificá los archivos después de copiarlos** — abrí OpenCode y confirmá que
    la configuración cargue.
 
@@ -287,8 +290,8 @@ un archivo de configuración pública:
 | `pnpm validate` | Validar estructura | Después de cambios |
 | `pnpm sanitize:check` | Buscar secretos/paths | Antes de distribuir |
 | `pnpm install:dry-run` | Simular instalación | Antes de copiar archivos |
-| `pnpm backup` | Respaldar estado actual | Antes de cambios grandes |
-| `pnpm rollback` | Restaurar backup | Si algo sale mal |
+| `pnpm backup:plan` | Mostrar plan de backup | Antes de cambios grandes |
+| `pnpm rollback:plan` | Mostrar plan de rollback (no ejecuta) | Si algo sale mal |
 
 ---
 

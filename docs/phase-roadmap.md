@@ -7,7 +7,7 @@
 
 ## Estado actual
 
-**Fase actual: Phase 1** — Install UX & Documentation Foundation.
+**Fase actual: Phase 1.1** — Documentation Accuracy & Beginner Clarity Fix.
 
 ---
 
@@ -42,7 +42,7 @@ perfiles, scripts, y documentación inicial.
 
 ---
 
-### Phase 1 — Install UX & Documentation Foundation 🔄 En curso
+### Phase 1 — Install UX & Documentation Foundation ✅ Completada
 
 **Objetivo:** Convertir el bootstrap inicial en un kit comprensible, usable y
 seguro tanto para usuarios técnicos como para principiantes.
@@ -74,6 +74,37 @@ seguro tanto para usuarios técnicos como para principiantes.
 - ✅ `pnpm test:all` pasa.
 - ✅ `pnpm install:dry-run --profile full` funciona.
 - ✅ `pnpm install:temp` funciona.
+
+---
+
+### Phase 1.1 — Documentation Accuracy & Beginner Clarity Fix ✅ Completada
+
+**Objetivo:** Corregir placeholders, inconsistencias y afirmaciones confusas
+en la documentación de Phase 1 para que el repo sea preciso y seguro para
+principiantes.
+
+#### Qué se hizo
+
+- **Audit de precisión** — `docs/PHASE-1.1-DOCUMENTATION-ACCURACY-AUDIT.md` con
+  23 issues clasificados (18 must fix, 5 should fix).
+- **README corregido:** URL real del repo, comandos correctos, Phase 1 marcada
+  como completada, Ponytail como guidance-only, gentle-ai como alignment-only,
+  compatibilidad como esperada/pendiente, cajas de "qué puedes / no puedes hacer".
+- **Guias corregidas:** `getting-started.md`, `installation-targets.md`,
+  `safety-and-sanitization.md` sin placeholders ni comandos inexistentes.
+- **Script fortalecido:** `docs-check.mjs` ahora detecta placeholders de repo
+  y claims incorrectos.
+- **Tests actualizados:** `docs-check.test.mjs` cubre placeholders y claims.
+
+#### Criterios de éxito
+
+- ✅ README sin placeholders de repo.
+- ✅ README usa URL real.
+- ✅ README no menciona comandos inexistentes.
+- ✅ README explica Ponytail como guidance-only.
+- ✅ README explica gentle-ai como alignment-only.
+- ✅ docs-check detecta placeholders en el futuro.
+- ✅ test:all PASS.
 
 ---
 
@@ -148,7 +179,8 @@ personas contribuyan, compartan, y mejoren el ecosistema.
 | Fase | Inicio estimado | Duración estimada | Estado |
 |---|---|---|---|
 | Phase 0 | 2026-06 | 2 semanas | ✅ Completada |
-| Phase 1 | 2026-06 | 1-2 semanas | 🔄 En curso |
+| Phase 1 | 2026-06 | 1-2 semanas | ✅ Completada |
+| Phase 1.1 | 2026-06 | 1 sesión | ✅ Completada |
 | Phase 2 | 2026-07 | 3-4 semanas | 📅 Planeada |
 | Phase 3 | 2026-08 | 2-3 semanas | 📅 Planeada |
 | Phase 4 | 2026-09+ | 4-6 semanas | 📅 Futura |

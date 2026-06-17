@@ -57,10 +57,40 @@ const REQUIRED_README_HEADINGS_PATTERNS = REQUIRED_README_SECTIONS.map(
   (s) => new RegExp(`^##+\\s+.*${escapeRegex(s)}`, "im")
 );
 
+/**
+ * Forbidden content patterns.
+ * - BLOCKED: must be fixed before pass.
+ * - WARNING: should be reviewed.
+ *
+ * Important: patterns that match `pnpm rollback` use negative lookahead
+ * to allow `pnpm rollback:plan` without flagging it.
+ */
 const FORBIDDEN_PATTERNS = [
+  // ── Paths and placeholders ─────────────────────────────────────────
   { pattern: /C:[\\]Users[\\]/g, severity: "BLOCKED", label: "Windows absolute path" },
-  { pattern: /\bTODO\b/g, severity: "WARNING", label: "TODO placeholder" },
-  { pattern: /\bFIXME\b/g, severity: "WARNING", label: "FIXME placeholder" },
+  { pattern: /\btu-usuario\b/g, severity: "BLOCKED", label: "Placeholder repo owner" },
+  { pattern: /github\.com\/harry\/opencode-kit/g, severity: "BLOCKED", label: "Wrong CI/links repo" },
+  { pattern: /github\.com\/tu-usuario\/opencode-kit/g, severity: "BLOCKED", label: "Placeholder repo URL" },
+
+  // ── Wrong commands ─────────────────────────────────────────────────
+  { pattern: /\bcd opencode-kit\b/g, severity: "BLOCKED", label: "Wrong directory name" },
+  { pattern: /pnpm rollback(?!:plan)/g, severity: "BLOCKED", label: "pnpm rollback (use rollback:plan)" },
+  { pattern: /pnpm backup\b(?!:plan)/g, severity: "BLOCKED", label: "pnpm backup (use backup:plan)" },
+
+  // ── False claims about Ponytail ────────────────────────────────────
+  // Only flag unambiguously wrong claims; negations are handled by test suite.
+  { pattern: /Ponytail se aplica automáticamente/g, severity: "BLOCKED", label: "Ponytail auto claim (it's guidance)" },
+
+  // ── False claims about gentle-ai ───────────────────────────────────
+  // Subtle negations ("no incluye") are handled by the test suite, not here.
+  { pattern: /gentle-ai.*(?:est[aá] instalado|es un runtime|es runtime)/gi, severity: "BLOCKED", label: "gentle-ai runtime claim (alignment-only)" },
+
+  // ── False claims about Codex ───────────────────────────────────────
+  { pattern: /Codex soportado(?!.*futur|.*pendiente)/g, severity: "WARNING", label: "Codex support claim (future only)" },
+
+  // ── Placeholder markers (code-style TODO/FIXME) ────────────────────
+  // Avoids Spanish "TODO" (everything) as false positive.
+  { pattern: /(?:@TODO|TODO:|FIXME:)/g, severity: "WARNING", label: "Code placeholder (TODO/FIXME)" },
 ];
 
 const NEW_DOCS = [
@@ -70,6 +100,12 @@ const NEW_DOCS = [
   "docs/safety-and-sanitization.md",
   "docs/phase-roadmap.md",
   "docs/PHASE-1-DOCUMENTATION-AUDIT.md",
+];
+
+/** Files to scan for forbidden patterns (README + all new docs marked for checks). */
+const SCAN_FILES = [
+  "README.md",
+  ...NEW_DOCS,
 ];
 
 function escapeRegex(string) {
@@ -127,7 +163,7 @@ async function checkReadmeSections() {
 
 async function checkForbiddenPatterns() {
   const results = [];
-  for (const doc of NEW_DOCS) {
+  for (const doc of SCAN_FILES) {
     const docPath = path.join(repoRoot, doc);
     if (!(await fileExists(docPath))) continue;
 
@@ -197,11 +233,11 @@ async function main() {
     console.log("\n🔴 BLOCKED");
     if (!docPass) console.log("  - Missing required docs");
     if (!sectionPass) console.log("  - Missing README sections");
-    if (blockedFound) console.log("  - Blocked patterns found (absolute paths)");
+    if (blockedFound) console.log("  - Blocked patterns found (placeholders, wrong commands, false claims)");
     process.exitCode = 1;
   } else if (warningFound) {
     console.log("\n🟡 PASS WITH WARNINGS");
-    console.log("  - Placeholder patterns found (TODO/FIXME)");
+    console.log("  - Warning-level patterns found (Codex claim, Ponytail default, TODOs)");
   } else {
     console.log("\n✅ PASS");
   }

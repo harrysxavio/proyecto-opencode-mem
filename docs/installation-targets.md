@@ -193,7 +193,7 @@ opencode
 
 ```bash
 # 1. Copiá los archivos a una carpeta, por ejemplo:
-cp -r opencode-kit/templates /ruta/mi-config/
+cp -r proyecto-opencode-mem/templates /ruta/mi-config/
 
 # 2. Configurá la variable
 export OPENCODE_CONFIG_DIR=/ruta/mi-config

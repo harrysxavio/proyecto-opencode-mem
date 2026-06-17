@@ -59,8 +59,8 @@ Si no lo tenés, descargalo de [git-scm.com](https://git-scm.com/).
 ## Paso 2: Cloná el repositorio
 
 ```bash
-git clone https://github.com/tu-usuario/opencode-kit.git
-cd opencode-kit
+git clone https://github.com/harrysxavio/proyecto-opencode-mem.git
+cd proyecto-opencode-mem
 ```
 
 ---
@@ -253,8 +253,8 @@ cada perfil más alto incluye todo lo del anterior.
 
 ```bash
 # En 10 comandos
-git clone https://github.com/tu-usuario/opencode-kit.git
-cd opencode-kit
+git clone https://github.com/harrysxavio/proyecto-opencode-mem.git
+cd proyecto-opencode-mem
 pnpm install
 pnpm validate
 pnpm doctor
