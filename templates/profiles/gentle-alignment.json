@@ -1,0 +1,4 @@
+{
+  "profile": "gentle-alignment",
+  "components": ["docs-core", "templates-core", "gentle-alignment-docs"]
+}

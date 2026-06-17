@@ -1,0 +1,35 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // Example OpenCode config generated from proyecto-opencode-mem.
+  // Copy manually to your OpenCode config location after review.
+
+  "agent": {
+    "manager": {
+      "mode": "primary",
+      "description": "Global Manager agent generated from the runtime kit template."
+    },
+    "sdd-init": { "mode": "subagent", "hidden": true },
+    "sdd-explore": { "mode": "subagent", "hidden": true },
+    "sdd-propose": { "mode": "subagent", "hidden": true },
+    "sdd-spec": { "mode": "subagent", "hidden": true },
+    "sdd-design": { "mode": "subagent", "hidden": true },
+    "sdd-tasks": { "mode": "subagent", "hidden": true },
+    "sdd-apply": { "mode": "subagent", "hidden": true },
+    "sdd-verify": { "mode": "subagent", "hidden": true },
+    "sdd-archive": { "mode": "subagent", "hidden": true },
+    "sdd-onboard": { "mode": "subagent", "hidden": true }
+  },
+
+  "skills": {
+    "paths": [
+      "${OPENCODE_KIT_DIR}/skills",
+      "${OPENCODE_KIT_DIR}/agents/sdd"
+    ]
+  },
+
+  "plugin": [
+    // Optional after review:
+    // "${OPENCODE_KIT_DIR}/plugins/engram.template.ts"
+  ]
+}

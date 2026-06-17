@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "0.1",
+  "kitName": "proyecto-opencode-mem",
+  "profiles": {
+    "minimal": {
+      "description": "Base documentation and templates only",
+      "components": ["docs-core", "templates-core"]
+    },
+    "agents": {
+      "description": "Manager template and agent governance",
+      "components": ["docs-core", "templates-core", "manager-template"]
+    },
+    "sdd": {
+      "description": "SDD subagent templates and routing contracts",
+      "components": ["docs-core", "templates-core", "sdd-templates"]
+    },
+    "memory-enabled": {
+      "description": "Engram memory governance, Noise Gate and mem_context templates",
+      "components": ["docs-core", "templates-core", "engram-template", "memory-governance"]
+    },
+    "ponytail-code-gate": {
+      "description": "Ponytail code-task guidance, no plugin by default",
+      "components": ["docs-core", "templates-core", "ponytail-guidance"]
+    },
+    "gentle-alignment": {
+      "description": "gentle-ai alignment-only docs and architecture patterns",
+      "components": ["docs-core", "templates-core", "gentle-alignment-docs"]
+    },
+    "full": {
+      "description": "Manager + SDD + memory governance + Ponytail guidance; no gentle-ai runtime",
+      "components": [
+        "docs-core",
+        "templates-core",
+        "manager-template",
+        "sdd-templates",
+        "engram-template",
+        "memory-governance",
+        "ponytail-guidance",
+        "gentle-alignment-docs",
+        "validation-harness"
+      ]
+    }
+  },
+  "components": [
+    {
+      "id": "docs-core",
+      "type": "docs",
+      "paths": ["README.md", "docs/architecture.md", "docs/install.md"]
+    },
+    {
+      "id": "templates-core",
+      "type": "template",
+      "paths": ["templates/opencode.example.jsonc", "templates/AGENTS.example.md", "templates/env.example"]
+    },
+    {
+      "id": "manager-template",
+      "type": "agent-template",
+      "paths": ["agents/manager/manager.template.md"]
+    },
+    {
+      "id": "sdd-templates",
+      "type": "agent-template",
+      "paths": ["agents/sdd"]
+    },
+    {
+      "id": "engram-template",
+      "type": "plugin-template",
+      "paths": ["plugins/engram.template.ts"]
+    },
+    {
+      "id": "memory-governance",
+      "type": "docs",
+      "paths": ["docs/memory-governance.md"]
+    },
+    {
+      "id": "ponytail-guidance",
+      "type": "docs",
+      "paths": ["docs/manager.md", "templates/AGENTS.example.md"]
+    },
+    {
+      "id": "gentle-alignment-docs",
+      "type": "docs",
+      "paths": ["docs/architecture.md", "docs/manager.md"]
+    },
+    {
+      "id": "validation-harness",
+      "type": "script",
+      "paths": ["scripts/doctor.mjs", "scripts/validate.mjs", "scripts/sanitize-check.mjs"]
+    }
+  ]
+}

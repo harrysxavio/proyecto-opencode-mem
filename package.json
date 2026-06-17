@@ -1,0 +1,22 @@
+{
+  "name": "proyecto-opencode-mem",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Installable and sanitized OpenCode runtime kit with Manager, SDD agents, Engram memory governance, skills, tests and profiles.",
+  "scripts": {
+    "doctor": "node scripts/doctor.mjs",
+    "validate": "node scripts/validate.mjs",
+    "sanitize:check": "node scripts/sanitize-check.mjs",
+    "test": "node --test",
+    "test:all": "node scripts/validate.mjs && node scripts/sanitize-check.mjs && node --test",
+    "install:dry-run": "node scripts/install.mjs --dry-run",
+    "install:temp": "node scripts/install-temp.mjs",
+    "backup:plan": "node scripts/backup.mjs --plan",
+    "rollback:plan": "node scripts/rollback.mjs --plan",
+    "export:inventory": "node scripts/export-inventory.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "profile": "ponytail-code-gate",
+  "components": ["docs-core", "templates-core", "ponytail-guidance"]
+}

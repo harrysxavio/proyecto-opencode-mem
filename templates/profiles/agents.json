@@ -1,0 +1,4 @@
+{
+  "profile": "agents",
+  "components": ["docs-core", "templates-core", "manager-template"]
+}

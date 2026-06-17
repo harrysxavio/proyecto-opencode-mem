@@ -1,0 +1,16 @@
+node_modules/
+tests/tmp/
+coverage/
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+*.log
+*.zip
+*.tar
+*.tgz
+dist/
+tmp/

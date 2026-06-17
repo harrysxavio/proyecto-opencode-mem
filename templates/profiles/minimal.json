@@ -1,0 +1,4 @@
+{
+  "profile": "minimal",
+  "components": ["docs-core", "templates-core"]
+}

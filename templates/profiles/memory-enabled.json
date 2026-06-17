@@ -1,0 +1,4 @@
+{
+  "profile": "memory-enabled",
+  "components": ["docs-core", "templates-core", "engram-template", "memory-governance"]
+}

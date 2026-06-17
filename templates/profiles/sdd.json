@@ -1,0 +1,4 @@
+{
+  "profile": "sdd",
+  "components": ["docs-core", "templates-core", "sdd-templates"]
+}

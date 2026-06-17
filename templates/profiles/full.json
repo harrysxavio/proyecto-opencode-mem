@@ -1,0 +1,14 @@
+{
+  "profile": "full",
+  "components": [
+    "docs-core",
+    "templates-core",
+    "manager-template",
+    "sdd-templates",
+    "engram-template",
+    "memory-governance",
+    "ponytail-guidance",
+    "gentle-alignment-docs",
+    "validation-harness"
+  ]
+}
