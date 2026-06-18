@@ -9,6 +9,8 @@ Este repositorio unifica la arquitectura de agente para **OpenCode** y **Codex**
 | **OpenCode** | [`QUICKSTART_OPENCODE.md`](QUICKSTART_OPENCODE.md) |
 | **Codex** | [`QUICKSTART_CODEX.md`](QUICKSTART_CODEX.md) |
 
+> 📘 **Arquitectura completa**: Si querés entender en detalle cómo funciona todo —capas, componentes, flujos, memoria, Noise Gate, contratos, skills, y cómo se comunican— leé el documento maestro [`arquitectura.md`](arquitectura.md). Está escrito tanto para audiencia técnica como no técnica.
+
 ## Contratos portables
 
 Los contratos definen QUÉ hace cada componente, no CÓMO se implementa:
@@ -392,7 +394,7 @@ Cada vez que el Manager considera guardar algo, hace estas preguntas:
 
 ### ¿Por qué es importante?
 
-Sin Noise Gate, el Manager guardaría TODO: cada "sí", cada "mostrame", cada "jaja". La memoria se llenaría de ruido y las búsquedas serían inútiles. Con Noise Gate, la memoria tiene **señal, no ruido**.
+Sin Noise Gate, el Manager guardaría **todo**: cada "sí", cada "mostrame", cada "jaja". La memoria se llenaría de ruido y las búsquedas serían inútiles. Con Noise Gate, la memoria tiene **señal, no ruido**.
 
 ---
 

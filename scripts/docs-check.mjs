@@ -98,6 +98,7 @@ const NEW_DOCS = [
   "docs/codex/getting-started.md",
   "docs/codex/overlay-install.md",
   "docs/codex/troubleshooting.md",
+  "arquitectura.md",
 ];
 
 /** Files to scan for forbidden patterns (README + all new docs marked for checks). */
