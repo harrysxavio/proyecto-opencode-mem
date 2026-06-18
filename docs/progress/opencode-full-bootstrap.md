@@ -58,7 +58,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 ### 2026-06-18 — Task 2
 
 - Status: `completed`.
-- Commits: `1a2c5d6`, `a771a49`, `359dc90`, `be6fbbe`.
+- Commits: `1a2c5d6`, `a771a49`, `359dc90`, `be6fbbe`, `797fe7c`.
 - Tests:
   - TDD focalizado: `12/12`.
   - `pnpm test:powershell`: `40/40`.
@@ -66,7 +66,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 - Reviews:
   - Self-review: `APPROVED`.
   - Spec: `APPROVED`.
-  - Quality: `pending` hasta re-review.
+  - Quality: `APPROVED`.
 
 ## Decisiones
 
