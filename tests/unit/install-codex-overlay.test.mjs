@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -39,6 +39,30 @@ test("installCodexOverlay writes overlay files and rollback metadata into fixtur
   assert.match(agents, /Manager is the single primary orchestrator/);
   assert.ok(metadata.backupId);
   assert.ok(metadata.files.includes("AGENTS.md"));
+});
+
+test("installCodexOverlay backs up existing overlay files before overwrite", async () => {
+  const target = await mkdtemp(path.join(os.tmpdir(), "codex-overlay-"));
+  await writeFile(path.join(target, "AGENTS.md"), "existing agents", "utf8");
+  await mkdir(path.join(target, "skills", "opencode-runtime-kit", "manager-router"), { recursive: true });
+  await writeFile(
+    path.join(target, "skills", "opencode-runtime-kit", "manager-router", "SKILL.md"),
+    "existing skill",
+    "utf8"
+  );
+
+  const result = await installCodexOverlay({ target, dryRun: false, backupId: "backup-test" });
+  const backedUpAgents = await readFile(path.join(result.backupDir, "AGENTS.md"), "utf8");
+  const backedUpSkill = await readFile(
+    path.join(result.backupDir, "skills", "opencode-runtime-kit", "manager-router", "SKILL.md"),
+    "utf8"
+  );
+  const metadata = JSON.parse(await readFile(path.join(result.backupDir, "manifest.json"), "utf8"));
+
+  assert.equal(backedUpAgents, "existing agents");
+  assert.equal(backedUpSkill, "existing skill");
+  assert.ok(metadata.backedUp.includes("AGENTS.md"));
+  assert.ok(metadata.backedUp.includes("skills/opencode-runtime-kit/manager-router"));
 });
 
 test("runCodexDoctor validates installed overlay", async () => {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { repoRoot } from "./manifest-utils.mjs";
@@ -85,15 +85,35 @@ async function copyIfExists(source, destination) {
   await cp(source, destination, { recursive: true, force: true });
 }
 
+async function pathExists(candidate) {
+  try {
+    await access(candidate);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function backupDestinationIfExists(action, backupDir) {
+  if (!await pathExists(action.destination)) return null;
+  const backupPath = path.join(backupDir, action.relativeDestination);
+  await mkdir(path.dirname(backupPath), { recursive: true });
+  await cp(action.destination, backupPath, { recursive: true, force: true });
+  return action.relativeDestination;
+}
+
 export async function installCodexOverlay(options = {}) {
   const plan = await buildCodexOverlayPlan(options);
   if (plan.dryRun) return plan;
 
   await mkdir(plan.backupDir, { recursive: true });
   const written = [];
+  const backedUp = [];
 
   for (const action of plan.actions) {
     const source = path.join(repoRoot, action.source);
+    const backup = await backupDestinationIfExists(action, plan.backupDir);
+    if (backup) backedUp.push(backup);
     await copyIfExists(source, action.destination);
     written.push(action.relativeDestination);
   }
@@ -101,7 +121,8 @@ export async function installCodexOverlay(options = {}) {
   const metadata = {
     backupId: plan.backupId,
     installedAt: new Date().toISOString(),
-    files: written
+    files: written,
+    backedUp
   };
   const metadataPath = path.join(plan.target, ".opencode-kit", "last-install.json");
   await mkdir(path.dirname(metadataPath), { recursive: true });
