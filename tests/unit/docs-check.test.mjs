@@ -50,28 +50,21 @@ describe("docs-check — README sections", () => {
   });
 
   const requiredSections = [
-    { name: "Table of contents", pattern: /^##+ .*[Tt]abla.*[Cc]ontenidos/im },
-    { name: "Architecture", pattern: /^##+ .*[Aa]rquitectura/im },
-    { name: "Manager", pattern: /^##+ .*[Mm]anager/im },
-    { name: "SDD pipeline", pattern: /^##+ .*SDD/im },
-    { name: "Engram", pattern: /^##+ .*[Ee]ngram/im },
-    { name: "Ponytail", pattern: /^##+ .*[Pp]onytail/im },
-    { name: "gentle-ai", pattern: /^##+ .*gentle-ai/im },
-    { name: "Profiles", pattern: /^##+ .*[Pp]erfiles/im },
-    { name: "Quick Start", pattern: /^##+ .*[Gg]uía [Rr]ápida/im },
-    { name: "Installation targets", pattern: /^##+ .*[Dd]estinos.*[Ii]nstalación/im },
-    { name: "Safety and sanitization", pattern: /^##+ .*[Ss]eguridad.*[Ss]anitización/im },
-    { name: "Phase roadmap", pattern: /^##+ .*[Hh]oja.*[Rr]uta/im },
-    { name: "FAQ", pattern: /^##+ .*FAQ/im },
-    { name: "Glossary", pattern: /^##+ .*[Gg]losario/im },
-    { name: "Environment variables", pattern: /^##+ .*[Vv]ariables.*[Ee]ntorno/im },
-    { name: "Compatibility", pattern: /^##+ .*[Cc]ompatibilidad/im },
-    { name: "Uninstall", pattern: /^##+ .*[Dd]esinstalación/im },
-    { name: "Troubleshooting", pattern: /^##+ .*[Ss]olución.*[Pp]roblemas/im },
-    { name: "Community and support", pattern: /^##+ .*[Cc]omunidad.*[Ss]oporte/im },
-    { name: "Example walkthrough", pattern: /^##+ .*[Ee]jemplo.*[Gg]uiado/im },
-    { name: "Contributing", pattern: /^##+ .*[Cc]ontribuir/im },
-    { name: "License", pattern: /^##+ .*[Ll]icencia/im },
+    { name: "Arquitectura Codex", pattern: /^# Arquitectura Codex/im },
+    { name: "Personas no tecnicas", pattern: /^##+ .*personas no t.cnicas/im },
+    { name: "Flujo completo", pattern: /^##+ .*Flujo completo/im },
+    { name: "Memoria", pattern: /^##+ .*memoria/im },
+    { name: "Noise Gate", pattern: /^##+ .*Noise Gate/im },
+    { name: "Tokens", pattern: /^##+ .*Tokens/im },
+    { name: "Memoria entre sesiones", pattern: /^##+ .*Memoria entre sesiones/im },
+    { name: "Flujo explosivo", pattern: /^##+ .*Flujo explosivo/im },
+    { name: "Vista tecnica", pattern: /^##+ .*Vista t.cnica/im },
+    { name: "Auditoria OpenCode", pattern: /^##+ .*Auditor.a OpenCode/im },
+    { name: "Puntos de mejora", pattern: /^##+ .*Puntos de mejora/im },
+    { name: "Como usarlo", pattern: /^##+ .*C.mo usarlo/im },
+    { name: "Estado actual", pattern: /^##+ .*Estado actual/im },
+    { name: "Rollback", pattern: /^##+ .*Rollback/im },
+    { name: "Como validar", pattern: /^##+ .*C.mo validar/im },
   ];
 
   for (const section of requiredSections) {
@@ -111,98 +104,42 @@ describe("docs-check — forbidden patterns", () => {
   }
 });
 
-describe("docs-check — README accuracy", () => {
+describe("docs-check ? README accuracy", () => {
   let readme;
+  let codexReadme;
   let readmeLoaded = false;
 
-  it("should be able to load README", async () => {
+  it("should be able to load README and README_CODEX", async () => {
     readme = await readFile(path.join(repoRoot, "README.md"), "utf8");
+    codexReadme = await readFile(path.join(repoRoot, "README_CODEX.md"), "utf8");
     readmeLoaded = true;
   });
 
-  it("should use real repo URL, not placeholder", () => {
+  it("README should mirror README_CODEX as the primary project README", () => {
     if (!readmeLoaded) assert.fail("README not loaded");
-    const hasPlaceholder = /\btu-usuario\b/.test(readme);
-    assert.ok(!hasPlaceholder, "README contains placeholder 'tu-usuario'");
+    assert.equal(readme, codexReadme);
   });
 
-  it("should use correct clone command for real repo", () => {
+  it("should explain Codex normal vs Codex with this architecture", () => {
     if (!readmeLoaded) assert.fail("README not loaded");
-    const hasCorrectClone = /github\.com\/harrysxavio\/proyecto-opencode-mem\.git/.test(readme);
-    assert.ok(hasCorrectClone, "README clone URL does not point to the real repo");
+    assert.ok(/Codex normal/i.test(readme), "README does not explain Codex normal");
+    assert.ok(/Codex con esta arquitectura/i.test(readme), "README does not explain configured Codex");
   });
 
-  it("should use correct directory name in commands", () => {
+  it("should document persistent memory and token-efficient orchestration", () => {
     if (!readmeLoaded) assert.fail("README not loaded");
-    const wrongCd = /\bcd opencode-kit\b/.test(readme);
-    assert.ok(!wrongCd, "README references wrong directory name 'opencode-kit'");
+    assert.ok(/memoria persistente/i.test(readme), "README missing persistent memory explanation");
+    assert.ok(/memoria entre sesiones/i.test(readme), "README missing cross-session memory explanation");
+    assert.ok(/Noise Gate/i.test(readme), "README missing Noise Gate explanation");
+    assert.ok(/presupuesto de tokens/i.test(readme), "README missing token budget explanation");
+    assert.ok(/SUBAGENT_RESULT/i.test(readme), "README missing subagent flow marker");
   });
 
-  it("should not reference pnpm rollback without :plan suffix", () => {
+  it("should remain portable and sanitized", () => {
     if (!readmeLoaded) assert.fail("README not loaded");
-    const rollbackWithoutPlan = /pnpm rollback(?!:plan)/.test(readme);
-    assert.ok(!rollbackWithoutPlan, "README references pnpm rollback instead of pnpm rollback:plan");
-  });
-
-  it("should explain Ponytail as guidance-only, not auto plugin", () => {
-    if (!readmeLoaded) assert.fail("README not loaded");
-    const autoApply = /Ponytail se aplica automáticamente/.test(readme);
-    assert.ok(!autoApply, "README claims Ponytail applies automatically");
-    const hasGuidance = /guidance/i.test(readme) || /template/.test(readme);
-    assert.ok(hasGuidance, "README does not explain Ponytail as guidance/template");
-  });
-
-  it("should explain gentle-ai as alignment-only, not runtime", () => {
-    if (!readmeLoaded) assert.fail("README not loaded");
-    // Check for affirmative runtime claims (not negated or strikethrough)
-    const lines = readme.split("\n");
-    const affirmativeRuntime = lines.filter((l) => {
-      if (!/gentle-ai.*runtime/i.test(l)) return false;
-      if (/\bno\b.*gentle-ai/i.test(l)) return false;   // "no incluye gentle-ai runtime"
-      if (/~~.*~~/.test(l)) return false;                // strikethrough: ~~claim~~
-      return true;
-    });
-    assert.ok(
-      affirmativeRuntime.length === 0,
-      `README affirmatively claims gentle-ai is a runtime in lines: ${affirmativeRuntime.join(", ")}`,
-    );
-    const hasAlignmentOnly = /alignment-only/.test(readme);
-    assert.ok(hasAlignmentOnly, "README does not describe gentle-ai as alignment-only");
-  });
-
-  it("should not claim Codex is currently supported", () => {
-    if (!readmeLoaded) assert.fail("README not loaded");
-    const codexClaim = /Codex soportado(?!.*futur|.*pendiente)/.test(readme);
-    assert.ok(!codexClaim, "README claims Codex is supported (should be future/pending)");
-  });
-
-  it("should have 'Qué puedes hacer hoy' section", () => {
-    if (!readmeLoaded) assert.fail("README not loaded");
-    const hasCanDo = /Qué puedes hacer hoy/.test(readme);
-    assert.ok(hasCanDo, "README missing 'Qué puedes hacer hoy' section");
-  });
-
-  it("should have 'Qué todavía NO puedes hacer' section", () => {
-    if (!readmeLoaded) assert.fail("README not loaded");
-    const hasCannotDo = /Qué todavía NO puedes hacer/.test(readme);
-    assert.ok(hasCannotDo, "README missing 'Qué todavía NO puedes hacer' section");
-  });
-
-  it("should mark Phase 1 as completed", () => {
-    if (!readmeLoaded) assert.fail("README not loaded");
-    const phase1Completed = /Phase 1.*✅ Completada/.test(readme);
-    assert.ok(phase1Completed, "Phase 1 not marked as completed in README");
-  });
-
-  it("should not claim installer real activo", () => {
-    if (!readmeLoaded) assert.fail("README not loaded");
-    const installerReal = /installer real/.test(readme) || /instalador real/.test(readme);
-    // If mentioned, it should be in the "Qué NO puedes" section
-    if (installerReal) {
-      const inCannotSection = readme.indexOf("Qué todavía NO puedes") < readme.lastIndexOf("installer") ||
-                              readme.indexOf("Qué todavía NO puedes") < readme.lastIndexOf("instalador");
-      assert.ok(inCannotSection, "README mentions real installer outside of limitations section");
-    }
+    assert.ok(!/[A-Z]:\\/.test(readme), "README contains Windows absolute path");
+    assert.ok(!/harry/i.test(readme), "README contains personal username");
+    assert.ok(!/\btu-usuario\b/.test(readme), "README contains placeholder 'tu-usuario'");
   });
 });
 

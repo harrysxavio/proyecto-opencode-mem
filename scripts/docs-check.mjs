@@ -29,33 +29,40 @@ const REQUIRED_DOCS = [
 ];
 
 const REQUIRED_README_SECTIONS = [
-  "Tabla de contenidos",            // Table of Contents (Spanish)
-  "Arquitectura",                   // Architecture Overview
-  "Manager",                        // Manager Orchestrator
-  "SDD",                            // SDD pipeline
-  "Engram",                         // Engram persistent memory
-  "Ponytail",                       // Ponytail Code Gate
-  "gentle-ai",                      // gentle-ai alignment
-  "Perfiles",                       // Profiles
-  "Guía rápida",                    // Quick Start
-  "Destinos de instalación",        // Installation targets
-  "Seguridad y sanitización",       // Safety & sanitization
-  "Hoja de ruta",                   // Phase roadmap
-  "FAQ",                            // FAQ
-  "Glosario",                       // Glossary
-  "Variables de entorno",           // Environment variables reference
-  "Compatibilidad",                 // OpenCode version compatibility
-  "Desinstalación",                 // Uninstall instructions
-  "Solución de problemas",           // Troubleshooting
-  "Comunidad y soporte",            // Community / support
-  "Ejemplo guiado",                 // Example walkthrough
-  "Contribuir",                     // Contributing
-  "Licencia",                       // License
+  "Arquitectura Codex",
+  "personas no t?cnicas",
+  "Flujo completo",
+  "memoria",
+  "Noise Gate",
+  "Tokens",
+  "Memoria entre sesiones",
+  "Flujo explosivo",
+  "Vista t?cnica",
+  "Auditor?a OpenCode",
+  "Puntos de mejora",
+  "C?mo usarlo",
+  "Estado actual",
+  "Rollback",
+  "C?mo validar",
 ];
 
-const REQUIRED_README_HEADINGS_PATTERNS = REQUIRED_README_SECTIONS.map(
-  (s) => new RegExp(`^##+\\s+.*${escapeRegex(s)}`, "im")
-);
+const REQUIRED_README_HEADINGS_PATTERNS = [
+  /^# Arquitectura Codex/im,
+  /^##+\s+.*personas no t.cnicas/im,
+  /^##+\s+.*Flujo completo/im,
+  /^##+\s+.*memoria/im,
+  /^##+\s+.*Noise Gate/im,
+  /^##+\s+.*Tokens/im,
+  /^##+\s+.*Memoria entre sesiones/im,
+  /^##+\s+.*Flujo explosivo/im,
+  /^##+\s+.*Vista t.cnica/im,
+  /^##+\s+.*Auditor.a OpenCode/im,
+  /^##+\s+.*Puntos de mejora/im,
+  /^##+\s+.*C.mo usarlo/im,
+  /^##+\s+.*Estado actual/im,
+  /^##+\s+.*Rollback/im,
+  /^##+\s+.*C.mo validar/im,
+];
 
 /**
  * Forbidden content patterns.
@@ -74,7 +81,7 @@ const FORBIDDEN_PATTERNS = [
 
   // ── Wrong commands ─────────────────────────────────────────────────
   { pattern: /\bcd opencode-kit\b/g, severity: "BLOCKED", label: "Wrong directory name" },
-  { pattern: /pnpm rollback(?!:plan)/g, severity: "BLOCKED", label: "pnpm rollback (use rollback:plan)" },
+  { pattern: /pnpm rollback(?!:(?:plan|codex))/g, severity: "BLOCKED", label: "pnpm rollback (use rollback:plan or rollback:codex)" },
   { pattern: /pnpm backup\b(?!:plan)/g, severity: "BLOCKED", label: "pnpm backup (use backup:plan)" },
 
   // ── False claims about Ponytail ────────────────────────────────────
