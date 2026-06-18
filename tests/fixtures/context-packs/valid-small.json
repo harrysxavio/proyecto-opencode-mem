@@ -1,0 +1,19 @@
+{
+  "request_id": "20260618-1200-small",
+  "classification": "small",
+  "token_budget": 1200,
+  "included": [
+    {
+      "kind": "file",
+      "ref": "docs/codex-runtime.md",
+      "reason": "Codex runtime guide defines the target behavior",
+      "sensitivity": "low"
+    }
+  ],
+  "excluded": [
+    {
+      "ref": "docs/archive/old-notes.md",
+      "reason": "not relevant"
+    }
+  ]
+}

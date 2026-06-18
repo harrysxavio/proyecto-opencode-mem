@@ -259,11 +259,11 @@ git commit -m "feat: add codex skill registry generator"
 - Create: `tests/fixtures/context-packs/invalid-over-budget.json`
 - Modify: `package.json`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Test valid pack passes and over-budget pack fails.
 
-- [ ] **Step 2: Implement validator**
+- [x] **Step 2: Implement validator**
 
 Rules:
 - required fields: `request_id`, `classification`, `token_budget`, `included`, `excluded`;
@@ -272,22 +272,22 @@ Rules:
 - included item must have `kind`, `ref`, `reason`;
 - max included default: 8.
 
-- [ ] **Step 3: Add package script**
+- [x] **Step 3: Add package script**
 
 ```json
 "context:check": "node scripts/context-pack-check.mjs"
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```powershell
 node --test tests/unit/context-pack-check.test.mjs
-pnpm context:check tests/fixtures/context-packs/valid-small.json
+npm run context:check -- tests/fixtures/context-packs/valid-small.json
 ```
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add scripts/context-pack-check.mjs tests/unit/context-pack-check.test.mjs tests/fixtures/context-packs package.json
