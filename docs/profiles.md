@@ -30,6 +30,8 @@ del anterior.
 | **ponytail-code-gate** | 5 componentes | ~8 archivos | OpenCode intermedio |
 | **gentle-alignment** | 5 componentes | ~8 archivos | IA/LLM básico |
 | **full** | 22 componentes | ~30 archivos | Avanzado |
+| **codex** | 4 componentes | ~6 archivos | Codex básico |
+| **codex-full** | 7 componentes | ~20 archivos | Codex avanzado |
 
 ---
 
@@ -254,6 +256,70 @@ pnpm install:dry-run --profile full
 
 ---
 
+## codex
+
+> **Codex primero.** Perfil pensado para instalar la arquitectura del Manager
+> como overlay de Codex, sin depender de OpenCode.
+
+### Componentes
+
+- **docs-core** — Documentación base del kit.
+- **codex-manager-template** — Template compacto del Manager para Codex.
+- **codex-skills** — Skills Codex-first para routing, memoria, contexto y tokens.
+- **codex-memory-governance** — Guía de memoria segura para Codex.
+
+### Para quién
+
+- Usuarios que quieren mejorar primero Codex.
+- Equipos que quieren un Manager liviano y lazy-loaded.
+- Proyectos donde OpenCode vendrá después, no antes.
+
+### Cómo activarlo
+
+```bash
+pnpm install:dry-run --profile codex
+```
+
+> Nota: el instalador Codex real se implementa en una fase posterior. Hoy este
+> perfil ya define el contrato del manifest y permite validar componentes.
+
+---
+
+## codex-full
+
+> **Codex con pipeline completo.** Agrega SDD y validación al perfil `codex`.
+
+### Componentes de codex, más:
+
+- **templates-core** — Templates portables base.
+- **sdd-templates** — Subagentes SDD sanitizados.
+- **memory-governance** — Política de memoria compartida.
+- **validation-harness** — Scripts de validate, doctor y sanitize.
+
+### Diferencia con full
+
+`full` está orientado a OpenCode Kit completo. `codex-full` está orientado a
+Codex-first y no incluye el template runtime de plugin Engram por defecto.
+
+### Para quién
+
+- Usuarios avanzados de Codex.
+- Equipos que quieren SDD desde Codex.
+- Proyectos que necesitan validar memoria, contexto y tokens antes de portar a
+  OpenCode.
+
+### Cómo activarlo
+
+```bash
+pnpm install:dry-run --profile codex-full
+```
+
+> Nota: igual que `codex`, este perfil define el contrato antes del instalador
+> real. Eso evita prometer soporte runtime antes de tener doctor, backup y
+> rollback listos.
+
+---
+
 ## Compatibilidad entre perfiles
 
 | Perfil A | Perfil B | Se pueden combinar? |
@@ -263,6 +329,8 @@ pnpm install:dry-run --profile full
 | ponytail-code-gate | gentle-alignment | ✅ (no compiten) |
 | memory-enabled | sdd | ❌ (memory-enabled ya incluye sdd) |
 | full | cualquier otro | ❌ (full ya lo incluye todo) |
+| codex | codex-full | ❌ (codex-full ya incluye codex) |
+| codex-full | full | ⚠️ (objetivos distintos: Codex-first vs OpenCode full) |
 
 En la práctica, siempre elegí **un solo perfil**. Usá `full` si querés todo,
 o `minimal` si estás arrancando.
@@ -275,6 +343,8 @@ o `minimal` si estás arrancando.
 minimal  →  agents  →  sdd  →  memory-enabled  →  full
                    ↘                        ↗
          ponytail-code-gate → gentle-alignment
+
+codex → codex-full
 ```
 
 La línea horizontal muestra la progresión acumulativa. La línea diagonal

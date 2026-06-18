@@ -146,7 +146,7 @@ git commit -m "feat: add codex runtime profiles"
 - Create: `docs/codex-runtime.md`
 - Test: `tests/unit/codex-template.test.mjs`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Test that the template contains:
 - Manager as single primary orchestrator;
@@ -157,7 +157,7 @@ Test that the template contains:
 - no OpenCode binary paths;
 - no private absolute paths.
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 ```powershell
 node --test tests/unit/codex-template.test.mjs
@@ -165,15 +165,15 @@ node --test tests/unit/codex-template.test.mjs
 
 Expected: FAIL because file does not exist.
 
-- [ ] **Step 3: Create template**
+- [x] **Step 3: Create template**
 
 The template must be short. It should reference skills/docs instead of embedding all protocols.
 
-- [ ] **Step 4: Create user guide**
+- [x] **Step 4: Create user guide**
 
 `docs/codex-runtime.md` must explain install targets, rollback, memory layers, and beginner workflow.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 ```powershell
 node --test tests/unit/codex-template.test.mjs
@@ -183,7 +183,7 @@ node scripts/sanitize-check.mjs
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add templates/codex/AGENTS.codex.example.md docs/codex-runtime.md tests/unit/codex-template.test.mjs
