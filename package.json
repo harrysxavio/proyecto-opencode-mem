@@ -21,7 +21,8 @@
     "memory:lint": "node scripts/memory-lint.mjs",
     "tokens:report": "node scripts/token-budget-report.mjs",
     "install:codex:dry-run": "node scripts/install-codex-overlay.mjs --dry-run",
-    "codex:doctor": "node scripts/codex-doctor.mjs"
+    "codex:doctor": "node scripts/codex-doctor.mjs",
+    "install:opencode:dry-run": "node scripts/install-opencode-overlay.mjs --dry-run"
   },
   "engines": {
     "node": ">=20"

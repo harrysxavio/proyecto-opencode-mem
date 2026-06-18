@@ -420,7 +420,7 @@ git commit -m "feat: add codex overlay installer"
 - Create later: `scripts/install-opencode-overlay.mjs`
 - Create later: `tests/integration/opencode-overlay-dry-run.test.mjs`
 
-- [ ] **Step 1: Confirm Codex gates pass**
+- [x] **Step 1: Confirm Codex gates pass**
 
 Run:
 
@@ -432,15 +432,15 @@ pnpm tokens:report
 
 Expected: PASS.
 
-- [ ] **Step 2: Write OpenCode adaptation doc**
+- [x] **Step 2: Write OpenCode adaptation doc**
 
 State explicitly: do not write to `<OPENCODE_APP_INSTALL_DIR>`.
 
-- [ ] **Step 3: Implement dry-run-only OpenCode overlay installer**
+- [x] **Step 3: Implement dry-run-only OpenCode overlay installer**
 
 Installer must reject binary install path and accept only config overlay target.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```powershell
 node --test tests/integration/opencode-overlay-dry-run.test.mjs
@@ -449,7 +449,7 @@ node scripts/sanitize-check.mjs
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add docs/opencode-adaptation.md scripts/install-opencode-overlay.mjs tests/integration/opencode-overlay-dry-run.test.mjs
