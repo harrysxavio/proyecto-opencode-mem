@@ -1,5 +1,14 @@
-# Skills
+# Portable skills
 
-Phase 0 does not import real skills. This directory is reserved for sanitized skills and examples.
+This directory contains the 18 sanitized skills installed for OpenCode and Codex.
 
-Use `examples/` for synthetic skill snippets and keep real runtime skills out until a reviewed import phase.
+Each skill is documentation with frontmatter, not an executable plugin. Runtime installers copy the directories to `skills/opencode-runtime-kit/` and generate a destination-aware registry.
+
+Run:
+
+```bash
+pnpm codex:registry
+pnpm test:all
+```
+
+Do not include private paths, credentials, logs or runtime databases.

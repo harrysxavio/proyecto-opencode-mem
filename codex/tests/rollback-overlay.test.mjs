@@ -44,3 +44,12 @@ test("rollbackCodexOverlay rejects update-managed OpenCode app directories", asy
     /update-managed/
   );
 });
+
+test("buildCodexRollbackPlan rejects backup ids that escape the target", async () => {
+  const target = await mkdtemp(path.join(os.tmpdir(), "codex-rollback-"));
+  await installCodexOverlay({ target, dryRun: false, backupId: "safe-backup" });
+  await assert.rejects(
+    () => buildCodexRollbackPlan({ target, backupId: "../outside", dryRun: true }),
+    /invalid backupId/
+  );
+});

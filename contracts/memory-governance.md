@@ -2,39 +2,23 @@
 
 ## Propósito
 
-Gobernar qué se guarda en memoria persistente, cómo se recupera y cómo se mantiene la calidad de la información entre sesiones.
+Definir qué se guarda en memoria persistente, cómo se recupera y cómo se evita memoria ruidosa o sensible entre sesiones.
 
 ## Reglas de escritura
 
-Guardar solo cuando:
+Guardar decisiones, bugs con causa raíz, descubrimientos no obvios, preferencias estables, cambios de configuración y resúmenes de sesión. No guardar prompts crudos, logs completos, secretos, código fuente ni conjeturas.
 
-1. Se tomó una decisión arquitectónica o de diseño.
-2. Se corrigió un bug con causa raíz conocida.
-3. Se descubrió algo no obvio sobre el codebase.
-4. Se estableció una preferencia del usuario o convención reusable.
-5. Se cambió configuración o entorno.
-6. Se necesita un session summary para handoff.
+## Recuperación
 
-NO guardar: prompts crudos, logs, secretos, código fuente, fallos transitorios, conjeturas.
-
-## Reglas de recuperación
-
-1. Intentar contexto de sesión reciente primero (rápido).
-2. Si no se encuentra, búsqueda por keywords.
-3. Observación completa solo si el resultado es relevante.
-4. ADRs o docs versionados como autoridad final.
-
-## F4C Selector
-
-Al recuperar memorias, priorizar por: relevancia (0.5) + recencia (0.3) + tipo (0.2).
-Tipos con prioridad: decision > constraint > architecture > bugfix > discovery > config > other.
-Deducar memorias con mismo topic_key — mantener la de mayor score.
-
-## Session Close
-
-Antes de finalizar una sesión, guardar session summary con: Goal, Instructions, Discoveries, Accomplished, Next Steps, Relevant Files.
+1. Contexto reciente.
+2. Búsqueda por palabras clave.
+3. Observación completa sólo si es relevante.
+4. Docs y ADRs versionados como autoridad del proyecto.
 
 ## Runtime Adaptations
 
-- **OpenCode**: usa Engram MCP (`mem_save`, `mem_search`, `mem_context`, `mem_session_summary`) con auto-triggers.
-- **Codex**: usa memorias SQLite nativas con Noise Gate como paso explícito antes de guardar.
+- **OpenCode:** puede usar Engram/MCP si está instalado y configurado.
+- **Codex:** puede usar el sistema de memoria que exponga el runtime.
+- **Sin backend:** el Manager continúa con contexto de sesión y declara que no hay persistencia.
+
+Este contrato y `memory-governance/SKILL.md` gobiernan una capacidad; no crean una base de datos ni instalan un proveedor.

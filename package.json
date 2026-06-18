@@ -29,7 +29,10 @@
     "codex:tokens:report": "node codex/scripts/token-budget-report.mjs",
     "codex:registry": "node codex/scripts/skill-registry-generate.mjs",
     "opencode:install:dry-run": "node opencode/scripts/install-overlay.mjs --dry-run",
-    "opencode:doctor": "node opencode/scripts/doctor.mjs"
+    "opencode:install": "node opencode/scripts/install-overlay.mjs",
+    "opencode:doctor": "node opencode/scripts/doctor.mjs",
+    "opencode:rollback:dry-run": "node opencode/scripts/rollback-overlay.mjs --dry-run",
+    "opencode:rollback": "node opencode/scripts/rollback-overlay.mjs"
   },
   "engines": {
     "node": ">=20"

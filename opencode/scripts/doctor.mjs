@@ -26,19 +26,42 @@ async function readIfExists(filePath) {
 }
 
 export async function runOpenCodeDoctor(options = {}) {
-  const target = path.resolve(options.target ?? path.join(process.env.USERPROFILE ?? ".", ".config", "opencode"));
+  const home = process.env.USERPROFILE ?? process.env.HOME ?? ".";
+  const target = path.resolve(options.target ?? path.join(home, ".config", "opencode"));
   const failures = [];
   const warnings = [];
+  const required = [
+    "AGENTS.md",
+    ".atl/skill-registry.md",
+    "skills/opencode-runtime-kit/manager-router/SKILL.md",
+    "skills/opencode-runtime-kit/memory-governance/SKILL.md",
+    "skills/opencode-runtime-kit/noise-gate/SKILL.md",
+    "skills/opencode-runtime-kit/context-pack-builder/SKILL.md",
+    "skills/opencode-runtime-kit/token-budgeter/SKILL.md",
+    ".opencode-kit/last-install.json"
+  ];
+
+  for (const relative of required) {
+    if (!existsSync(path.join(target, relative))) failures.push(`Missing ${relative}`);
+  }
 
   const agents = await readIfExists(path.join(target, "AGENTS.md"));
-  if (!agents) failures.push("AGENTS.md not found");
-  if (agents.length > 65536) warnings.push("AGENTS.md exceeds 64 KiB — consider splitting gates");
-  if (/[A-Z]:\\/.test(agents)) warnings.push("AGENTS.md contains Windows absolute path — not portable");
-  if (agents && !/Manager/.test(agents)) failures.push("AGENTS.md does not reference Manager");
+  if (agents.length > 65536) warnings.push("AGENTS.md exceeds 64 KiB; consider moving details to skills");
+  if (/[A-Z]:\\/.test(agents)) failures.push("AGENTS.md contains a non-portable Windows absolute path");
+  if (agents && !/Manager global/i.test(agents)) failures.push("AGENTS.md does not declare the OpenCode Manager contract");
 
-  const engramFiles = ["engram.db", "engram.sqlite", ".engram/"];
-  const hasEngram = engramFiles.some(f => existsSync(path.join(target, f)));
-  if (!hasEngram) warnings.push("Engram database not detected — memory may not persist");
+  const registry = await readIfExists(path.join(target, ".atl", "skill-registry.md"));
+  if (registry && !/skills\/opencode-runtime-kit\/manager-router\/SKILL\.md/.test(registry)) {
+    failures.push("skill registry has invalid installed paths");
+  }
+  const registeredSkills = [...registry.matchAll(/\|\s*[^|\n]+\s*\|\s*[^|\n]+\s*\|\s*([^|\n]+SKILL\.md)\s*\|/g)]
+    .map((match) => match[1].trim());
+  if (registry && registeredSkills.length !== 18) {
+    failures.push(`skill registry must contain 18 skills, found ${registeredSkills.length}`);
+  }
+  for (const relative of registeredSkills) {
+    if (!existsSync(path.join(target, relative))) failures.push(`Registry target missing ${relative}`);
+  }
 
   return { target, failures, warnings };
 }
@@ -50,9 +73,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   console.log(`Target: ${result.target}`);
   for (const warning of result.warnings) console.log(`Warning: ${warning}`);
   if (result.failures.length) {
-    console.error("OPencode DOCTOR FAIL");
+    console.error("OPENCODE DOCTOR FAIL");
     for (const failure of result.failures) console.error(`- ${failure}`);
     process.exit(1);
   }
-  console.log("OPencode DOCTOR PASS");
+  console.log("OPENCODE DOCTOR PASS");
 }

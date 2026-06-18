@@ -3,6 +3,7 @@ import { access, cp, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { repoRoot } from "../../scripts/manifest-utils.mjs";
+import { buildSkillRegistry } from "./skill-registry-generate.mjs";
 
 const overlayFiles = [
   {
@@ -141,6 +142,16 @@ async function copyIfExists(source, destination) {
   await cp(source, destination, { recursive: true, force: true });
 }
 
+async function writeOverlayAction(action) {
+  if (action.source === ".atl/skill-registry.md") {
+    const registry = await buildSkillRegistry(repoRoot, { pathPrefix: "skills/opencode-runtime-kit" });
+    await mkdir(path.dirname(action.destination), { recursive: true });
+    await writeFile(action.destination, registry.content, "utf8");
+    return;
+  }
+  await copyIfExists(path.join(repoRoot, action.source), action.destination);
+}
+
 async function pathExists(candidate) {
   try {
     await access(candidate);
@@ -167,10 +178,9 @@ export async function installCodexOverlay(options = {}) {
   const backedUp = [];
 
   for (const action of plan.actions) {
-    const source = path.join(repoRoot, action.source);
     const backup = await backupDestinationIfExists(action, plan.backupDir);
     if (backup) backedUp.push(backup);
-    await copyIfExists(source, action.destination);
+    await writeOverlayAction(action);
     written.push(action.relativeDestination);
   }
 

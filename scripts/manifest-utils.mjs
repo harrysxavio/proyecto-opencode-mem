@@ -64,7 +64,14 @@ export const requiredScripts = [
   "scripts/install-temp.mjs",
   "scripts/backup.mjs",
   "scripts/rollback.mjs",
-  "scripts/export-inventory.mjs"
+  "scripts/export-inventory.mjs",
+  "codex/scripts/install-overlay.mjs",
+  "codex/scripts/doctor.mjs",
+  "codex/scripts/rollback-overlay.mjs",
+  "codex/scripts/skill-registry-generate.mjs",
+  "opencode/scripts/install-overlay.mjs",
+  "opencode/scripts/doctor.mjs",
+  "opencode/scripts/rollback-overlay.mjs"
 ];
 
 export async function loadManifest(root = repoRoot) {

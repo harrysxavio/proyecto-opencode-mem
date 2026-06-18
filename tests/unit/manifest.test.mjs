@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { loadManifest, requiredProfiles } from "../../scripts/manifest-utils.mjs";
+import { readFile } from "node:fs/promises";
 
 test("manifest is valid JSON with required profiles", async () => {
   const manifest = await loadManifest();
@@ -58,4 +59,15 @@ test("manifest includes portable Codex Noise Gate skill", async () => {
 
   assert.ok(codexSkills, "missing codex-skills component");
   assert.ok(codexSkills.paths.includes("skills/noise-gate"));
+});
+
+test("package exposes real install, doctor and rollback commands for both runtimes", async () => {
+  const packageJson = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
+  for (const runtime of ["codex", "opencode"]) {
+    assert.ok(packageJson.scripts[`${runtime}:install:dry-run`]);
+    assert.ok(packageJson.scripts[`${runtime}:install`]);
+    assert.ok(packageJson.scripts[`${runtime}:doctor`]);
+    assert.ok(packageJson.scripts[`${runtime}:rollback:dry-run`]);
+    assert.ok(packageJson.scripts[`${runtime}:rollback`]);
+  }
 });

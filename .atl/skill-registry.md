@@ -4,21 +4,21 @@
 
 | Skill | Trigger / description | Path |
 |---|---|---|
-| bigquery-table-cleaning | No description provided | skills/bigquery-table-cleaning/SKILL.md |
-| branch-pr | No description provided | skills/branch-pr/SKILL.md |
-| chained-pr | No description provided | skills/chained-pr/SKILL.md |
-| cognitive-doc-design | No description provided | skills/cognitive-doc-design/SKILL.md |
+| bigquery-table-cleaning | Plan BigQuery table cleaning and validation. Trigger: BigQuery cleaning, nulls, schema, types, or clean table. | skills/bigquery-table-cleaning/SKILL.md |
+| branch-pr | Prepare branches and pull requests with issue-first checks. Trigger: creating, opening, or preparing PRs. | skills/branch-pr/SKILL.md |
+| chained-pr | Split oversized work into chained or stacked review slices. Trigger: PRs over 400 lines, large refactors, or review budget risk. | skills/chained-pr/SKILL.md |
+| cognitive-doc-design | Write documentation that reduces cognitive load. Trigger: README, guide, onboarding, RFC, architecture doc, or beginner explanation. | skills/cognitive-doc-design/SKILL.md |
 | context-pack-builder | Build minimal context packs for broad work, SDD phases, research, code review, and memory-heavy requests. | skills/context-pack-builder/SKILL.md |
-| deploy-security-gate | No description provided | skills/deploy-security-gate/SKILL.md |
-| flow-diagram | No description provided | skills/flow-diagram/SKILL.md |
-| issue-creation | No description provided | skills/issue-creation/SKILL.md |
-| judgment-day | No description provided | skills/judgment-day/SKILL.md |
+| deploy-security-gate | Review production deployment readiness. Trigger: deploy, release, production, credentials, hosting, or security gate. | skills/deploy-security-gate/SKILL.md |
+| flow-diagram | Create text or Mermaid diagrams of request and system flows. Trigger: flow, diagram, sequence, architecture map, or explain step by step. | skills/flow-diagram/SKILL.md |
+| issue-creation | Create actionable issues with evidence and acceptance criteria. Trigger: bug reports, feature requests, or backlog items. | skills/issue-creation/SKILL.md |
+| judgment-day | Run adversarial review before accepting important work. Trigger: dual review, deep review, critical diff, or architecture challenge. | skills/judgment-day/SKILL.md |
 | manager-router | Classify requests, choose the smallest safe route, and decide when Codex should use memory, docs, skills, tools, SDD, or subagents. | skills/manager-router/SKILL.md |
 | memory-governance | Retrieve, write, update, and reject memory using evidence, scope, sensitivity, and token discipline. | skills/memory-governance/SKILL.md |
 | noise-gate | Classify user prompts as instruction, question, confirmation, navigation, or noise before deciding what deserves memory. Use when Codex is about to save memory, summarize a session, compact context, or reduce noisy prompt capture inspired by the OpenCode Noise Gate design. | skills/noise-gate/SKILL.md |
-| sandbox-data-loader | No description provided | skills/sandbox-data-loader/SKILL.md |
-| skill-improver | No description provided | skills/skill-improver/SKILL.md |
-| sql-learning | No description provided | skills/sql-learning/SKILL.md |
+| sandbox-data-loader | Safely inspect and stage user-provided datasets. Trigger: CSV, XLSX, dataset load, schema detection, duplicates, or PII scan. | skills/sandbox-data-loader/SKILL.md |
+| skill-improver | Audit and improve existing skills. Trigger: improve skills, audit skills, refactor skills, or skill quality. | skills/skill-improver/SKILL.md |
+| sql-learning | Capture reusable SQL lessons and business rules. Trigger: completed SQL cleanup, inferred rule, repeated query issue, or reusable pattern. | skills/sql-learning/SKILL.md |
 | token-budgeter | Estimate and reduce fixed and dynamic token cost by moving detail into lazy-loaded docs, skills, scripts, and context packs. | skills/token-budgeter/SKILL.md |
-| web-design-guidelines | No description provided | skills/web-design-guidelines/SKILL.md |
-| work-unit-commits | No description provided | skills/work-unit-commits/SKILL.md |
+| web-design-guidelines | Review UI/UX and accessibility quality. Trigger: frontend audit, UI review, accessibility, visual quality, or design gate. | skills/web-design-guidelines/SKILL.md |
+| work-unit-commits | Plan implementation as reviewable work units. Trigger: implementation, commit splitting, chained PRs, or keeping tests and docs with code. | skills/work-unit-commits/SKILL.md |

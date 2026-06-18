@@ -66,3 +66,5 @@ pnpm codex:context:check         # Validar context packs
 pnpm codex:tokens:report         # Reporte de tokens
 pnpm codex:registry              # Generar registry de skills
 ```
+
+> El doctor valida archivos locales; memoria, conectores y servicios externos deben estar disponibles en Codex por separado.

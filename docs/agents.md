@@ -1,11 +1,9 @@
 # Agent Templates
 
-The kit provides Manager templates for each runtime.
+| Archivo | Runtime | Propósito |
+|---|---|---|
+| `opencode/manager.template.md` | OpenCode | Manager detallado con rutas SDD y gates condicionales |
+| `codex/manager.template.md` | Codex | Manager compacto con skills y Context Packs |
+| `contracts/manager.md` | Ambos | Contrato portable |
 
-| File | Runtime | Purpose |
-|------|---------|---------|
-| `opencode/manager.template.md` | OpenCode | Full 15-section protocol with SDD subagents, Graphify, GPT-5.5 gates |
-| `codex/manager.template.md` | Codex | Compact overlay with skills, memory, context packs |
-| `contracts/manager.md` | Both | Portable Manager contract (runtime-agnostic) |
-
-Templates are installed via overlay installers (`pnpm codex:install`, `pnpm opencode:install:dry-run`).
+Instalación: `pnpm opencode:install --target <path>` o `pnpm codex:install --target <path>`. Los templates pueden mencionar capacidades externas, pero el instalador no las descarga.

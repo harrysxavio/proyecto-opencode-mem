@@ -1,23 +1,23 @@
 # Install
 
-Phase 0 is not a real installer. It supports dry-run and temp installation only.
+Hay dos familias de comandos:
 
-## Dry-run
-
-```bash
-pnpm install:dry-run -- --profile full
-```
-
-This prints planned components and files.
-
-## Temp install
+## Overlay real por runtime
 
 ```bash
-pnpm install:temp
+pnpm codex:install:dry-run --target ~/.codex
+pnpm codex:install --target ~/.codex
+pnpm opencode:install:dry-run --target ~/.config/opencode
+pnpm opencode:install --target ~/.config/opencode
 ```
 
-This copies selected files into `tests/tmp/install-temp` only.
+Estos comandos implementan backup, metadata, doctor y rollback.
 
-## Real install
+## Perfiles de staging del repositorio
 
-Real installation is intentionally out of scope for Phase 0.
+```bash
+pnpm install:dry-run --profile full
+pnpm install:temp --profile full
+```
+
+El comando genérico sólo muestra/copia perfiles dentro del repositorio para pruebas. No activa OpenCode ni Codex. Para uso real elige un instalador de runtime.

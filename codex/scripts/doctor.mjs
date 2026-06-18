@@ -55,6 +55,14 @@ export async function runCodexDoctor(options = {}) {
 
   const registry = await readIfExists(path.join(target, ".atl/skill-registry.md"));
   if (registry && !/manager-router/.test(registry)) failures.push("skill registry missing manager-router");
+  const registeredSkills = [...registry.matchAll(/\|\s*[^|\n]+\s*\|\s*[^|\n]+\s*\|\s*([^|\n]+SKILL\.md)\s*\|/g)]
+    .map((match) => match[1].trim());
+  if (registry && registeredSkills.length !== 18) {
+    failures.push(`skill registry must contain 18 skills, found ${registeredSkills.length}`);
+  }
+  for (const relative of registeredSkills) {
+    if (!existsSync(path.join(target, relative))) failures.push(`Registry target missing ${relative}`);
+  }
 
   return { target, failures, warnings };
 }

@@ -1,165 +1,83 @@
-# QuickStart — Codex Runtime
+# QuickStart — Codex
 
-5 pasos para tener el Runtime Kit funcionando en Codex. Al final, tu asistente tendrá un **Manager** que gestiona memoria persistente, skills portables y contexto eficiente entre sesiones.
+## Resultado
 
----
+Instala el Manager Codex y 18 skills dentro de tu configuración de usuario. No instala Codex, memoria, conectores, MCP ni modelos.
 
-## 1. Clonar e instalar
+## 1. Prerrequisitos
+
+- Codex instalado y autenticado.
+- Git, Node.js 20+ y `pnpm`.
 
 ```bash
 git clone https://github.com/harrysxavio/proyecto-opencode-mem.git
 cd proyecto-opencode-mem
+corepack enable
 pnpm install
+pnpm test:all
 ```
 
-**Qué pasa**: Se descarga el kit completo con contratos, templates, skills, scripts y tests.
-
----
-
-## 2. Validar el kit
-
-```bash
-pnpm validate
-pnpm test:codex
-```
-
-**Qué pasa**: `validate` verifica que el manifiesto esté íntegro, todas las rutas existan y los perfiles resuelvan. `test:codex` ejecuta los tests del adaptador Codex (scripts de instalación, doctor, rollback, memory-lint, context-pack-check, token-budget-report y skill-registry).
-
-**Si pasa**: Tu kit está sano. Todos los scripts de Codex funcionan correctamente.
-
----
-
-## 3. Ver qué va a instalar (dry-run)
+## 2. Revisar sin escribir
 
 ```bash
 pnpm codex:install:dry-run --target ~/.codex
 ```
 
-**Qué pasa**: El dry-run simula la instalación sin escribir nada. Muestra:
-- Qué archivos se van a copiar
-- Dónde se va a hacer backup
-- Qué perfiles y skills se van a instalar
+El dry-run muestra cada destino y el backup previsto sin crear archivos.
 
-**Ejemplo de salida**:
-```
-DRY RUN Codex overlay plan
-Target: ~/.codex
-Backup dir: ~/.codex/.opencode-kit-backups/2026-06-18T120000Z
-Would copy:
-  codex/manager.template.md → AGENTS.md
-  skills/manager-router/     → skills/opencode-runtime-kit/manager-router/
-  skills/memory-governance/  → skills/opencode-runtime-kit/memory-governance/
-  skills/noise-gate/         → skills/opencode-runtime-kit/noise-gate/
-  ...
-Would generate: skill-registry.md
-```
+## 3. Instalar
 
-Esto **no modifica nada**. Podés ejecutarlo cuantas veces quieras para inspeccionar el plan.
-
----
-
-## 4. Instalar el overlay
+Cierra Codex antes de cambiar su overlay.
 
 ```bash
 pnpm codex:install --target ~/.codex
 ```
 
-**Qué se instala**:
+Se crean:
 
-| Archivo destino | Qué hace |
-|----------------|----------|
-| `<target>/AGENTS.md` | **Manager overlay**: orquesta solicitudes, gestiona memoria, carga skills bajo demanda |
-| `<target>/skills/opencode-runtime-kit/` | **18 skills portables**: manager-router, memory-governance, noise-gate, context-pack-builder, token-budgeter, judgment-day, flow-diagram, work-unit-commits, branch-pr, issue-creation, deploy-security-gate, cognitive-doc-design, web-design-guidelines, skill-improver, bigquery-table-cleaning, sandbox-data-loader, sql-learning, chained-pr |
-| `<target>/skill-registry.md` | **Registro**: Codex encuentra cada skill por trigger |
+- `AGENTS.md`;
+- `skills/opencode-runtime-kit/<skill>/SKILL.md`;
+- `.atl/skill-registry.md`;
+- `.opencode-kit/last-install.json`;
+- `.opencode-kit-backups/<id>/`.
 
-**Qué cambia en el comportamiento de Codex**:
+El target es obligatorio para una instalación real.
 
-| Antes | Después |
-|-------|---------|
-| Sin memoria entre sesiones | El Manager busca memoria al empezar (`mem_context`, `mem_search`) |
-| Sin skills especializados | 18 skills portables cargados por trigger (diagramas, PRs, debugging, diseño UI, etc.) |
-| Sin control de tokens | Context packs mínimos + token budgeting |
-| Sin Noise Gate | El Manager filtra qué merece guardarse en memoria |
-
-> ⚠️ **Siempre hace backup** del AGENTS.md existente en `<target>/.opencode-kit-backups/`.
-
----
-
-## 5. Validar la instalación
+## 4. Validar
 
 ```bash
 pnpm codex:doctor --target ~/.codex
 ```
 
-**Qué verifica el doctor**:
+El doctor comprueba el overlay local y rutas del registro. No comprueba autenticación, memoria, conectores o servicios externos.
 
-- ✅ Que `<target>/AGENTS.md` existe y tiene contenido
-- ✅ Que `<target>/skills/opencode-runtime-kit/` existe con skills
-- ✅ Que `<target>/skill-registry.md` existe y tiene referencias válidas
-- ✅ Que no hay archivos rotos o referencias a rutas absolutas
+## 5. Reiniciar y probar
 
-**Si pasa**: Codex ya está usando el Manager overlay. **Toda solicitud que hagas ahora pasa por el flujo del Manager.**
+Abre Codex y pregunta:
 
----
+> ¿Qué contrato sigue el Manager y qué skills del Runtime Kit tienes disponibles?
 
-## Cómo probar que funciona
+Codex usará memoria, tools o agentes sólo si tu entorno los expone. El overlay no los crea.
 
-Después de instalar, abrí Codex y probá estos mensajes:
-
-**Prueba 1** — Verificar que el Manager cargó:
-> "Hola, ¿qué skills tenés disponibles?"
-
-El Manager debería listar los skills instalados (manager-router, memory-governance, noise-gate, etc.).
-
-**Prueba 2** — Verificar skills de diagramas:
-> "Necesito un diagrama de flujo para el login con OAuth"
-
-El Manager debería cargar el skill `flow-diagram` y generar un diagrama ASCII.
-
-**Prueba 3** — Verificar memoria entre sesiones:
-> "Acordate de que estamos probando el Runtime Kit en Codex"
-
-Después cerrá la sesión, abrí una nueva y preguntá:
-> "¿Qué contexto había de la sesión anterior?"
-
-**Prueba 4** — Verificar context packs:
-> "Hacé un análisis de tokens de mi sesión actual"
-
-El Manager puede generar un reporte de presupuesto de tokens.
-
-**Prueba 5** — Probar un flujo completo:
-> "Creá una Pull Request para el cambio que hicimos en el archivo X"
-
-El Manager debería cargar `branch-pr` y `work-unit-commits`, planificar commits, y preparar la PR.
-
----
-
-## Rollback si algo sale mal
+## Rollback
 
 ```bash
+pnpm codex:rollback:dry-run --target ~/.codex
 pnpm codex:rollback --target ~/.codex
 ```
 
-Restaura el AGENTS.md y skills originales desde el backup automático.
+Restaura destinos respaldados y elimina únicamente elementos creados por la última instalación.
 
----
+## Herramientas del repositorio
 
-## Comandos útiles
+Estos comandos se ejecutan desde el clon; no se copian al target:
 
 ```bash
-pnpm codex:install:dry-run          # Ver plan sin escribir
-pnpm codex:install                  # Instalar overlay
-pnpm codex:doctor                   # Validar instalación
-pnpm codex:rollback                 # Restaurar backup
-pnpm codex:memory:lint              # Validar archivos de memoria
-pnpm codex:context:check            # Validar context packs
-pnpm codex:tokens:report            # Reporte de tokens
-pnpm codex:registry                 # Generar skill-registry
-pnpm test:codex                     # Tests del adaptador Codex
+pnpm codex:memory:lint
+pnpm codex:context:check
+pnpm codex:tokens:report
+pnpm codex:registry
+pnpm test:codex
 ```
 
----
-
-**Ver también**: [`README.md`](README.md) — arquitectura completa explicada para principiantes.  
-[`ARCHITECTURE.md`](ARCHITECTURE.md) — vista técnica de contratos y adaptadores.  
-[`docs/codex/getting-started.md`](docs/codex/getting-started.md) — guía detallada de instalación.
+Lee la [arquitectura maestra](arquitectura.md) para conocer límites y responsabilidades.

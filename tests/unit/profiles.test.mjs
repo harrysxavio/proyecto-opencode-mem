@@ -16,6 +16,7 @@ test("full profile includes expected governance components", async () => {
   assert.ok(ids.includes("manager-template-codex"));
   assert.ok(ids.includes("manager-contract"));
   assert.ok(ids.includes("sdd-pipeline-contract"));
+  assert.ok(ids.includes("codex-skills"));
   assert.ok(ids.includes("memory-governance-contract"));
   assert.ok(ids.includes("ponytail-guidance"));
 });

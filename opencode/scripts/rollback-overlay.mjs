@@ -2,7 +2,7 @@
 import { access, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateCodexOverlayTarget } from "./install-overlay.mjs";
+import { validateOpenCodeOverlayTarget } from "./install-overlay.mjs";
 
 function argValue(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -37,8 +37,8 @@ async function readJson(filePath) {
   return JSON.parse(await readFile(filePath, "utf8"));
 }
 
-function defaultCodexTarget() {
-  return path.join(process.env.USERPROFILE ?? process.env.HOME ?? ".", ".codex");
+function defaultOpenCodeTarget() {
+  return path.join(process.env.USERPROFILE ?? process.env.HOME ?? ".", ".config", "opencode");
 }
 
 function validateBackupId(value) {
@@ -55,8 +55,8 @@ function validateMetadataPath(value) {
   return value;
 }
 
-export async function buildCodexRollbackPlan(options = {}) {
-  const target = validateCodexOverlayTarget(options.target ?? defaultCodexTarget());
+export async function buildOpenCodeRollbackPlan(options = {}) {
+  const target = validateOpenCodeOverlayTarget(options.target ?? defaultOpenCodeTarget());
   const installMetadataPath = path.join(target, ".opencode-kit", "last-install.json");
   const installMetadata = await readJson(installMetadataPath);
   const backupId = validateBackupId(options.backupId ?? installMetadata.backupId);
@@ -88,8 +88,8 @@ export async function buildCodexRollbackPlan(options = {}) {
   };
 }
 
-export async function rollbackCodexOverlay(options = {}) {
-  const plan = await buildCodexRollbackPlan(options);
+export async function rollbackOpenCodeOverlay(options = {}) {
+  const plan = await buildOpenCodeRollbackPlan(options);
   if (plan.dryRun) return plan;
 
   const removed = [];
@@ -124,11 +124,11 @@ export async function rollbackCodexOverlay(options = {}) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const dryRun = process.argv.includes("--dry-run");
-  const target = argValue("--target", null) ?? positionalTarget() ?? defaultCodexTarget();
+  const target = argValue("--target", null) ?? positionalTarget() ?? defaultOpenCodeTarget();
   const backupId = argValue("--backup-id", null);
   try {
-    const result = await rollbackCodexOverlay({ target, backupId, dryRun });
-    console.log(`${dryRun ? "DRY RUN " : ""}Codex overlay rollback plan`);
+    const result = await rollbackOpenCodeOverlay({ target, backupId, dryRun });
+    console.log(`${dryRun ? "DRY RUN " : ""}OpenCode overlay rollback plan`);
     console.log(`Target: ${result.target}`);
     console.log(`Backup: ${result.backupDir}`);
     for (const item of result.remove) console.log(`- remove ${item.relativePath}`);
@@ -136,7 +136,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (dryRun) console.log("No files were changed.");
     else console.log(`Rollback complete: restored ${result.restored.length}, removed ${result.removed.length}`);
   } catch (error) {
-    console.error(`Codex overlay rollback failed: ${error.message}`);
+    console.error(`OpenCode overlay rollback failed: ${error.message}`);
     process.exit(1);
   }
 }
+
