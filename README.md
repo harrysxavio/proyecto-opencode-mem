@@ -185,13 +185,31 @@ El Noise Gate **no guarda nada por sí mismo**. Solo clasifica. La guardada la e
 | "Mostrame la carpeta src" | ❌ Ruido — navegación temporal | No |
 | "jaja" | ❌ Ruido — chatter | No |
 
-## 6. Memoria entre sesiones: cómo se guarda y cómo se recupera
+## 6. Memoria persistente: cómo aprende la herramienta
 
-La memoria entre sesiones funciona cuando el runtime expone un backend persistente (Engram MCP en OpenCode, SQLite en Codex). Si no existe ese backend, el kit no inventa persistencia — trabaja con el contexto de la sesión actual y lo declara.
+La memoria persistente es lo que separa una herramienta que arranca de cero cada sesión de una que **aprende con el tiempo**. Sin memoria, cada sesión es un "hola, ¿qué proyecto es este?". Con memoria, el tooling sabe qué decidiste, qué bugs ya resolviste, qué patrones preferís y qué descubriste que no es obvio.
+
+### No es "guardar el chat"
+
+La memoria persistente no guarda conversaciones enteras ni logs. Guarda **observaciones estructuradas** con una decisión o descubrimiento cada una. Es más parecido a un cuaderno de bitácora que a una grabación.
+
+### Tipos de memoria
+
+| Tipo | ¿Qué guarda? | Ejemplo |
+|------|-------------|---------|
+| **architecture** | Decisiones de diseño, tradeoffs aceptados | "Usamos PostgreSQL por las funciones de array" |
+| **decision** | Cualquier decisión que afecta al proyecto | "Los commits van en español de ahora en más" |
+| **bugfix** | Bug con causa raíz identificada | "El error era X por Y en archivo Z" |
+| **discovery** | Algo no obvio que aprendiste | "La API rechaza montos con >2 decimales" |
+| **preference** | Preferencia reusable del usuario | "Preferís pnpm sobre npm" |
+| **pattern** | Patrón que estableciste y vale repetir | "Cada skill tiene frontmatter con name y description" |
+| **config** | Cambio de configuración o entorno | "Node 22 rompe el test runner, usamos Node 20" |
+
+Cada observación incluye: título, tipo, **What** (qué pasó), **Why** (por qué), **Where** (archivos afectados) y **Learned** (gotchas o lecciones). Con esa estructura, el Manager entiende no solo *qué* pasó, sino *por qué* y *dónde* — y puede aplicar ese aprendizaje en el futuro.
 
 ### Cómo se guarda (después del Noise Gate)
 
-El flujo completo desde que el usuario escribe algo hasta que queda en memoria:
+El flujo completo desde que el usuario escribe algo hasta que queda en memoria permanente:
 
 ```
 Usuario escribe: "Cambiá la DB a PostgreSQL"
@@ -224,12 +242,12 @@ Usuario escribe: "Cambiá la DB a PostgreSQL"
  ⑧ Listo. Esa memoria existe para futuras sesiones.
 ```
 
-### Cómo se recupera (en la próxima sesión)
+### Cómo se recupera (en cualquier momento, no solo entre sesiones)
 
-Cuando empezás una nueva sesión y preguntás algo relacionado:
+La memoria se consulta **todo el tiempo**, no solo al arrancar una sesión. Cada vez que el Manager necesita contexto que no está en el prompt actual, busca:
 
 ```
-Sesión nueva. Preguntás: "¿Qué base de datos estamos usando?"
+En medio de una sesión: "¿Qué base de datos estamos usando?"
        │
        ▼
  ① Manager busca: mem_context() → sesiones recientes
@@ -252,15 +270,105 @@ Sesión nueva. Preguntás: "¿Qué base de datos estamos usando?"
      funciones de array. Está en prisma/schema.prisma."
 ```
 
+También se busca **proactivamente**:
+- Al empezar una tarea que puede haberse hecho antes, el Manager busca antes de actuar.
+- Si el usuario menciona un tema del que no hay contexto, el Manager busca memoria.
+- Si hay conflicto entre lo que dice el usuario y lo que dice la memoria, el Manager lo reporta.
+
+### Cómo aprende la herramienta con el tiempo
+
+Cada sesión que pasa, la memoria acumula decisiones, fixes y descubrimientos. Esto produce una curva de aprendizaje:
+
+```
+Sesión 1:   "¿Qué base de datos usamos?"  → "No hay memoria todavía"
+Sesión 2:   "¿Qué base de datos usamos?"  → "Decidiste PostgreSQL, está en prisma/schema.prisma"
+Sesión 10:  "Agregá una columna"           → el Manager ya sabe la DB, el ORM, la convención de nombres
+Sesión 20:  El Manager responde antes de   → porque la memoria ya cubre la mayoría de las decisiones
+            que preguntes
+```
+
+Cada vez que preguntaste "¿qué hicimos?" en este repositorio, el Manager buscó memoria de sesiones anteriores y respondió con el contexto exacto. Esa es la diferencia entre una herramienta que repite preguntas y una que **aprende**:
+
+- **Sin memoria**: cada sesión empieza en cero. Preguntás lo mismo cada vez.
+- **Con memoria**: las decisiones se acumulan. Con el tiempo, el Manager necesita menos preguntas porque ya sabe cómo trabajás.
+
 ### Ejemplo real de este repositorio
 
 Este mismo README, los bugs fixeados, y las decisiones arquitectónicas de todo el desarrollo se guardaron usando este flujo. Hoy hay **379 observaciones** en **14 sesiones** a lo largo de **10 días**. Cada vez que preguntaste "¿qué hicimos?" el Manager buscó `mem_context()` y respondió con sesiones anteriores. Eso es el Noise Gate + memoria funcionando.
 
 **Ver**: [`contrato completo de memoria`](contracts/memory-governance.md) y [`contrato del Noise Gate`](contracts/noise-gate.md) para las reglas exactas.
 
-## 7. Tokens y contexto
+## 7. Tokens y contexto: hacer más con menos
 
-El Manager evita cargar todo el repositorio. Para trabajo amplio crea un Context Pack con clasificación, presupuesto, elementos incluidos y exclusiones justificadas. `token-budgeter` ayuda a mover detalle estable a docs o skills lazy-loaded.
+Los runtimes tienen un límite de contexto (ventana de tokens). Si el Manager carga todo el proyecto, skills, memoria y documentación cada vez, ese límite se alcanza rápido y el modelo empieza a "olvidar" el principio de la conversación. Esta arquitectura ataca ese problema de dos maneras: **no cargar lo que no hace falta** y **estructurar lo que se carga para que ocupe menos**.
+
+### Principio: carga diferida (lazy loading)
+
+Nada se carga automáticamente. Skills, contratos, documentos largos — todo se carga **solo cuando el Manager decide que es relevante**:
+
+```
+¿Qué pasa si pregunto "cómo configuro la DB"?
+  → Manager carga solo: contract/database.md, skill/sql-learning (1.2 KB)
+  → No carga: README, contratos de seguridad, skills de frontend, PLAN.md
+
+¿Qué pasa si pido "auditar accesibilidad"?
+  → Manager carga solo: skill/web-design-guidelines, contract/accessibility
+  → No carga: nada de DB, skills de BigQuery, scripts de instalación
+```
+
+El ahorro es enorme: skills individuales pesan ~2-5 KB. Cargar los 18 skills juntos serían ~70 KB innecesarios cada vez.
+
+### Skills individuales (cada skill pesa ~2-5 KB)
+
+Hay 18 skills, pero **nunca** se cargan todos juntos. Cada skill tiene un `description` con triggers. El Manager lee el description, y solo si coincide con la tarea carga el SKILL.md completo. Esto es equivalente a tener 18 manuales en un estante y agarrar solo el que necesitás.
+
+### Context Packs (para trabajo amplio)
+
+Cuando la tarea es grande (arquitectura, refactor multi-archivo, integración), el Manager arma un **Context Pack**: un JSON con los elementos necesarios, un presupuesto de tokens y exclusiones justificadas:
+
+```json
+{
+  "intent": "Agregar una columna a la tabla users",
+  "maxTokens": 4000,
+  "items": [
+    { "kind": "file", "ref": "prisma/schema.prisma", "reason": "schema actual" },
+    { "kind": "file", "ref": "contracts/memory-governance.md", "reason": "no guardar secretos" }
+  ],
+  "excluded": [
+    { "kind": "dir", "ref": "skills/", "reason": "no necesito skills para esto" }
+  ]
+}
+```
+
+Esto evita que el Manager lea archivos innecesarios y garantiza que el presupuesto de tokens se use donde importa.
+
+### token-budgeter
+
+Un skill específico (`token-budgeter`) ayuda al Manager a:
+1. Identificar archivos grandes que convendría mover a lazy loading
+2. Estimar cuántos tokens consume cada archivo o skill
+3. Sugerir qué documentación estable mover a docs/ (cargar solo cuando se pregunta por ella)
+
+### El Noise Gate también ayuda a los tokens
+
+Menos ruido en memoria = menos resultados que procesar en cada búsqueda = menos tokens gastados en filtrar basura. El Noise Gate no es solo para calidad de memoria — también es una optimización de tokens.
+
+### F4C Selector: busca precisa
+
+Cuando el Manager recupera memoria, usa el F4C Selector que rankea resultados por relevancia (50%), recencia (30%) y tipo (20%). Esto evita traer 20 resultados cuando 3 alcanzan. Top-k por defecto: 5 para preguntas simples, 10 para preguntas normales, 20 para arquitectura.
+
+### Resumen del aporte
+
+| Técnica | Aporte |
+|---------|--------|
+| Skills lazy-loaded | No se cargan ~70 KB de skills que no hacen falta |
+| Context Packs | Lectura acotada a lo necesario, con presupuesto explícito |
+| token-budgeter | Identifica qué mover a carga diferida |
+| Noise Gate | Menos ruido en memoria = menos tokens en búsquedas |
+| F4C Selector | Top-k acotado, no trae toda la base de memoria |
+| Session Summary | Resumen compacto en vez de dump de la sesión |
+
+El resultado: sesiones más largas, menos "olvidos" del modelo, respuestas más rápidas y menos costo de API. No es magia — es **no quemar tokens en lo que no importa**.
 
 ## 8. Qué NO hace ni instala
 

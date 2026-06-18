@@ -59,7 +59,7 @@ describe("docs-check — README sections", () => {
     { name: "Memoria", pattern: /^##+ .*memoria/im },
     { name: "Noise Gate", pattern: /^##+ .*Noise Gate/im },
     { name: "Tokens", pattern: /^##+ .*Tokens/im },
-    { name: "Memoria entre sesiones", pattern: /^##+ .*Memoria entre sesiones/im },
+    { name: "Memoria persistente", pattern: /^##+ .*Memoria persistente/im },
     { name: "Ponytail", pattern: /^##+ .*Ponytail/im },
     { name: "Estado actual", pattern: /^##+ .*Estado actual/im },
     { name: "Rollback", pattern: /^##+ .*Rollback/im },
@@ -120,7 +120,7 @@ describe("docs-check — README accuracy", () => {
   it("should document persistent memory and token-efficient orchestration", () => {
     if (!readmeLoaded) assert.fail("README not loaded");
     assert.ok(/memoria persistente/i.test(readme), "README missing persistent memory explanation");
-    assert.ok(/memoria entre sesiones/i.test(readme), "README missing cross-session memory explanation");
+    assert.ok(/persistente/i.test(readme), "README missing persistent memory explanation");
     assert.ok(/Noise Gate/i.test(readme), "README missing Noise Gate explanation");
     assert.ok(/tok/.test(readme), "README missing token explanation");
   });
