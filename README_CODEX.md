@@ -213,6 +213,212 @@ Resultado esperado:
 
 ---
 
+## 7.1 Memoria entre sesiones y memoria persistente
+
+La **memoria entre sesiones** es lo que permite que Codex cierre una conversación hoy y mañana pueda recuperar lo importante sin pedirte que expliques todo otra vez.
+
+La **memoria persistente** es la parte que queda guardada fuera del chat actual. No vive solamente en la ventana de conversación: queda registrada como observaciones, preferencias, decisiones, bugs, configuraciones o resúmenes que se pueden recuperar después.
+
+Dicho simple:
+
+- la conversación actual es como una reunión en vivo;
+- la memoria persistente es el acta útil de esa reunión;
+- el `session summary` es el resumen de cierre para que la próxima sesión sepa en qué estado quedó todo;
+- `mem_context` recupera contexto reciente rápido;
+- `mem_search` busca recuerdos concretos por tema;
+- `mem_get_observation` abre el recuerdo completo cuando el resultado de búsqueda sí importa;
+- `mem_save` guarda una decisión, hallazgo, preferencia o configuración que tiene valor futuro.
+
+### Flujo de memoria entre sesiones
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario
+    participant C1 as Codex sesión 1
+    participant NG as Noise Gate
+    participant M as Memoria persistente
+    participant C2 as Codex sesión 2
+
+    U->>C1: "Quiero que el Manager sea el orquestador principal"
+    C1->>NG: Clasifica el mensaje
+    NG-->>C1: instruction, guardar si hay decisión durable
+    C1->>M: mem_save(decision: Manager principal)
+    C1->>M: session summary con estado y pendientes
+    U->>C2: "Continuemos con la arquitectura"
+    C2->>M: mem_context()
+    M-->>C2: sesiones recientes y observaciones relevantes
+    C2->>M: mem_search("Manager orquestador")
+    M-->>C2: resultado resumido
+    C2->>M: mem_get_observation(id)
+    M-->>C2: contenido completo con evidencia
+    C2-->>U: respuesta usando la decisión persistente
+```
+
+### Sesión 1: cómo se guarda
+
+Ejemplo:
+
+```text
+Usuario: Desde ahora el Manager debe ser el orquestador principal y las skills solo especialistas.
+```
+
+El flujo correcto no es guardar todo el texto sin pensar. El flujo correcto es:
+
+1. `manager-router` entiende que hay una decisión arquitectónica.
+2. `noise-gate` clasifica el mensaje como `instruction`, no como ruido.
+3. `memory-governance` pregunta si tiene valor futuro.
+4. Como sí tiene valor futuro, se guarda con `mem_save`:
+   - tipo: `architecture` o `decision`;
+   - tema: Manager como orquestador;
+   - evidencia: el pedido del usuario y archivos tocados;
+   - alcance: proyecto o personal, según corresponda.
+5. Al cerrar, se escribe un `session summary` con qué se hizo, qué falta y qué archivos importan.
+
+### Sesión 2: cómo se recupera
+
+Ejemplo:
+
+```text
+Usuario: Sigamos con lo de la memoria y tokens.
+```
+
+El flujo correcto es:
+
+1. El Manager ve que “sigamos” depende de pasado.
+2. Primero usa `mem_context` para recuperar sesiones recientes.
+3. Si eso no basta, usa `mem_search` con una consulta mínima, por ejemplo `memoria tokens Manager`.
+4. Si encuentra un recuerdo relevante, usa `mem_get_observation` para leerlo completo.
+5. Solo mete en contexto la parte necesaria.
+6. Responde con continuidad, sin pedir que el usuario repita todo.
+
+Beneficio: Codex no recuerda por magia ni por volumen. Recuerda porque hay una ruta explícita de guardar, filtrar, recuperar y usar evidencia.
+
+---
+
+## 7.2 Flujo explosivo desde el llamado del usuario hasta la entrega de la respuesta
+
+Este **flujo explosivo** muestra todo lo que pasa detrás de una petición grande. La palabra “explosivo” acá significa “abierto en detalle”: se ven las piezas internas, no solo la respuesta final.
+
+Ejemplo de petición:
+
+```text
+Quiero mejorar la memoria del proyecto, traer lo útil de OpenCode, reducir tokens y dejarlo explicado para principiantes.
+```
+
+```mermaid
+flowchart TD
+    U["1. Llamado del usuario"] --> M["2. Manager: entiende intención, riesgo y tamaño"]
+    M --> G{¿Es simple o compleja?}
+    G -->|Simple| A1["Responder directo con poca carga"]
+    G -->|Compleja| R["3. manager-router elige ruta"]
+    R --> NG["4. noise-gate separa instrucción útil de ruido"]
+    NG --> MEM{¿Depende de memoria previa?}
+    MEM -->|Sí| MC["5a. mem_context para sesiones recientes"]
+    MC --> MS["5b. mem_search con query mínima"]
+    MS --> MO["5c. mem_get_observation solo si el resultado sirve"]
+    MEM -->|No| SKIP["5d. No cargar memoria innecesaria"]
+    R --> TB["6. token-budgeter define presupuesto de tokens"]
+    TB --> FIX["contexto fijo: solo reglas cortas"]
+    TB --> DYN["contexto dinámico: docs, memoria y skills bajo demanda"]
+    R --> SK["7. Cargar skills necesarias"]
+    SK --> S1["memory-governance"]
+    SK --> S2["context-pack-builder"]
+    SK --> S3["token-budgeter"]
+    SK --> S4["work-unit-commits u otra skill si aplica"]
+    R --> AG{¿Necesita agentes y subagentes?}
+    AG -->|No| DO["8a. Manager ejecuta inline"]
+    AG -->|Sí| SUB["8b. Subagente recibe tarea acotada"]
+    SUB --> SR["SUBAGENT_RESULT compacto"]
+    MO --> CP["9. Context pack mínimo"]
+    SKIP --> CP
+    FIX --> CP
+    DYN --> CP
+    S1 --> CP
+    S2 --> CP
+    S3 --> CP
+    S4 --> CP
+    CP --> DO
+    DO --> V["10. Verificación: tests, doctor, diff o evidencia"]
+    SR --> V
+    V --> WG{¿Hay aprendizaje durable?}
+    WG -->|Sí| SAVE["11a. mem_save con evidencia"]
+    WG -->|No| DROP["11b. No guardar ruido"]
+    SAVE --> RESP["12. Entrega de la respuesta"]
+    DROP --> RESP
+```
+
+### Qué hace cada pieza en ese ejemplo
+
+| Pieza | Qué decide | Beneficio real |
+| --- | --- | --- |
+| Manager | Si responde directo, usa skill, busca memoria o delega | Evita que Codex actúe como un bloque monolítico. |
+| Noise Gate | Si el texto trae señal útil o ruido | Evita guardar frases transitorias como memoria. |
+| Memoria persistente | Qué decisiones pasadas importan | Permite continuidad entre sesiones sin recargar todo. |
+| Skills | Qué procedimiento especializado se necesita | Da especialización sin inflar siempre el prompt. |
+| Agentes y subagentes | Si una parte conviene resolverla en contexto separado | Reduce ruido en tareas grandes y permite revisión fresca. |
+| Context pack | Qué archivos o recuerdos entran al trabajo actual | Evita leer veinte archivos cuando bastan cinco. |
+| Presupuesto de tokens | Cuánto contexto fijo y contexto dinámico se acepta | Mantiene espacio para razonar y no solo para copiar texto. |
+| Verificación | Qué prueba que el resultado es correcto | Cambia “parece listo” por evidencia. |
+
+### No es solo tener skills
+
+La mejora **no es solo tener skills**. Tener skills sin orquestación es como tener muchas herramientas sobre una mesa sin saber cuál usar.
+
+La arquitectura completa mejora porque combina:
+
+1. **Orquestación**: el Manager decide la ruta.
+2. **Filtro**: el Noise Gate evita memoria ruidosa.
+3. **Memoria persistente**: Engram conserva decisiones y estado entre sesiones.
+4. **Especialización**: las skills se cargan solo si aportan.
+5. **Delegación**: agentes y subagentes separan trabajos grandes o revisiones.
+6. **Economía de tokens**: se separa contexto fijo de contexto dinámico.
+7. **Evidencia**: cada cambio importante se valida con comandos, tests, doctor o diffs.
+
+---
+
+## 7.3 Cómo hacerlo eficiente en uso de tokens
+
+Para que el uso de tokens sea eficiente, la arquitectura usa una regla de presupuesto de tokens:
+
+> Lo que siempre se carga debe ser corto. Lo grande debe vivir en skills, docs, memoria o scripts y cargarse solo cuando el Manager lo justifique.
+
+### Contexto fijo vs contexto dinámico
+
+| Tipo | Qué contiene | Cuándo se usa | Regla de eficiencia |
+| --- | --- | --- | --- |
+| Contexto fijo | Reglas cortas del Manager, seguridad mínima, routing base | Siempre | Debe ser pequeño porque se paga en cada petición. |
+| Contexto dinámico | Memorias, docs, skills, salidas de comandos, archivos | Solo si la tarea lo necesita | Debe cargarse por intención y con límite. |
+
+### Checklist de tokens antes de trabajar
+
+Antes de cargar más contexto, el Manager debería preguntarse:
+
+1. ¿La petición depende de una decisión pasada?
+2. Si sí, ¿basta `mem_context` o necesito `mem_search`?
+3. ¿Necesito leer el recuerdo completo con `mem_get_observation` o el resumen basta?
+4. ¿Qué skill exacta necesito y cuál no?
+5. ¿Qué archivos son indispensables para responder?
+6. ¿Puedo construir un context pack de menos de ocho ítems?
+7. ¿Hay una verificación mecánica que evita leer documentación extra?
+
+### Ejemplo de ahorro
+
+Mala ruta:
+
+```text
+Cargar todo AGENTS.md largo + todas las skills + historial completo + docs completas + logs.
+```
+
+Ruta eficiente:
+
+```text
+Manager corto -> noise-gate -> mem_context si hace falta -> una búsqueda mem_search -> una skill -> tres archivos relevantes -> verificación -> respuesta.
+```
+
+La segunda ruta suele ser mejor porque deja más espacio de razonamiento. Menos tokens no significa menos calidad: significa menos ruido y más señal.
+
+---
+
 ## 8. Vista técnica: componentes instalados
 
 La instalación de Codex no modifica carpetas administradas por actualizaciones de la aplicación. Usa un overlay dentro de `<CODEX_HOME>`.

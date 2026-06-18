@@ -34,6 +34,31 @@ test("README_CODEX documents usage, rollback, audit, improvements and implementa
   assert.match(readme, /Qué se mejoró/i);
 });
 
+test("README_CODEX explains persistent memory across sessions with concrete retrieval and save flows", () => {
+  assert.match(readme, /memoria entre sesiones/i);
+  assert.match(readme, /memoria persistente/i);
+  assert.match(readme, /sesi[oó]n 1/i);
+  assert.match(readme, /sesi[oó]n 2/i);
+  assert.match(readme, /mem_context/i);
+  assert.match(readme, /mem_search/i);
+  assert.match(readme, /mem_get_observation/i);
+  assert.match(readme, /mem_save/i);
+  assert.match(readme, /session summary/i);
+});
+
+test("README_CODEX includes expanded end-to-end orchestration examples beyond having skills", () => {
+  assert.match(readme, /flujo explosivo/i);
+  assert.match(readme, /llamado del usuario/i);
+  assert.match(readme, /entrega de la respuesta/i);
+  assert.match(readme, /agentes y subagentes/i);
+  assert.match(readme, /SUBAGENT_RESULT/i);
+  assert.match(readme, /no es solo tener skills/i);
+  assert.match(readme, /contexto fijo/i);
+  assert.match(readme, /contexto din[aá]mico/i);
+  assert.match(readme, /presupuesto de tokens/i);
+});
+
+
 test("README_CODEX stays portable", () => {
   assert.doesNotMatch(readme, /[A-Z]:\\/);
   assert.doesNotMatch(readme, /harry/i);
