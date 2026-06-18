@@ -2,9 +2,12 @@ $ErrorActionPreference = 'Stop'
 
 BeforeAll {
     $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
-    $bootstrapPath = Join-Path $repoRoot 'installer/bootstrap.ps1'
-    $commandsRoot = Join-Path $repoRoot 'installer/commands'
+    $sourceBootstrapPath = Join-Path $repoRoot 'installer/bootstrap.ps1'
+    $isolatedInstallerRoot = Join-Path $TestDrive 'installer'
+    $bootstrapPath = Join-Path $isolatedInstallerRoot 'bootstrap.ps1'
+    $commandsRoot = Join-Path $isolatedInstallerRoot 'commands'
     New-Item -ItemType Directory -Path $commandsRoot -Force | Out-Null
+    Copy-Item -LiteralPath $sourceBootstrapPath -Destination $bootstrapPath
 }
 
 Describe 'bootstrap command router' {

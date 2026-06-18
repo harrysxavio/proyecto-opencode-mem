@@ -42,6 +42,21 @@ Write-Output 'token=a.b* token=A.B*'
         $result.StdErr.Trim() | Should -Be 'password=[REDACTED] password=P[ASS]'
     }
 
+    It 'redacts overlapping secrets completely regardless of input order in both streams' {
+        $scriptPath = Join-Path $TestDrive 'overlapping-secrets.ps1'
+        @"
+Write-Output 'value=abcdef'
+[Console]::Error.WriteLine('value=abcdef')
+"@ | Set-Content -LiteralPath $scriptPath
+
+        foreach ($secrets in @(@('abc', 'abcdef'), @('abcdef', 'abc'))) {
+            $result = Invoke-SafeProcess -FilePath $pwshPath -Arguments @('-NoProfile', '-File', $scriptPath) -Secrets $secrets
+
+            $result.StdOut.Trim() | Should -Be 'value=[REDACTED]'
+            $result.StdErr.Trim() | Should -Be 'value=[REDACTED]'
+        }
+    }
+
     It 'ignores empty secrets rather than altering output' {
         $scriptPath = Join-Path $TestDrive 'empty-secret.ps1'
         "Write-Output 'unchanged'" | Set-Content -LiteralPath $scriptPath
@@ -71,6 +86,34 @@ Write-Output 'token=a.b* token=A.B*'
 
         $result.ExitCode | Should -Be 0
         $result.StdOut.Trim() | Should -Be 'argument with spaces'
+    }
+
+    It 'preserves quotes, trailing backslashes, empty arguments, and shell metacharacters as literal data' {
+        $folder = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'argument fixtures with spaces')
+        $scriptPath = Join-Path $folder.FullName 'emit encoded arguments.ps1'
+        @'
+param([Parameter(ValueFromRemainingArguments)][string[]]$Values)
+for ($index = 0; $index -lt $Values.Count; $index++) {
+    "${index}:$([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Values[$index])))"
+}
+'@ | Set-Content -LiteralPath $scriptPath
+        $values = @(
+            'value "quoted" here',
+            'relative path with spaces\',
+            '',
+            'literal&value',
+            'literal$(Get-Date)',
+            'literal;value'
+        )
+
+        $result = Invoke-SafeProcess -FilePath $pwshPath -Arguments (@('-NoProfile', '-File', $scriptPath) + $values)
+
+        $expected = @(for ($index = 0; $index -lt $values.Count; $index++) {
+            "${index}:$([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($values[$index])))"
+        })
+        @($result.StdOut -split '\r?\n' | Where-Object { $_.Length -gt 0 }) | Should -Be $expected
+        $result.ExitCode | Should -Be 0
+        $result.StdErr | Should -BeNullOrEmpty
     }
 
     It 'exports only Invoke-SafeProcess and contains no shell evaluation primitive' {

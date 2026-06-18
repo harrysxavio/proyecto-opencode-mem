@@ -36,11 +36,16 @@ function Protect-ProcessOutput {
         [AllowEmptyCollection()][string[]]$Secrets
     )
 
-    $protected = $Text
+    $uniqueSecrets = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach ($secret in $Secrets) {
         if ($null -ne $secret -and $secret.Length -gt 0) {
-            $protected = $protected.Replace($secret, '[REDACTED]')
+            [void]$uniqueSecrets.Add($secret)
         }
+    }
+
+    $protected = $Text
+    foreach ($secret in @($uniqueSecrets | Sort-Object Length -Descending)) {
+        $protected = $protected.Replace($secret, '[REDACTED]')
     }
     return $protected
 }
