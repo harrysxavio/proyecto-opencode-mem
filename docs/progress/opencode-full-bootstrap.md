@@ -21,7 +21,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 | Task | Título | Status |
 |---|---|---|
 | Task 1 | [Establish the PowerShell test harness and lock contract](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-1-establish-the-powershell-test-harness-and-lock-contract) | `completed` |
-| Task 2 | [Build the safe process runner and public command router](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-2-build-the-safe-process-runner-and-public-command-router) | `in_progress` |
+| Task 2 | [Build the safe process runner and public command router](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-2-build-the-safe-process-runner-and-public-command-router) | `completed` |
 | Task 3 | [Implement Windows preflight and confirmed prerequisite installation](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-3-implement-windows-preflight-and-confirmed-prerequisite-installation) | `pending` |
 | Task 4 | [Add receipts, backups, checkpoints, resume and safe rollback](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-4-add-receipts-backups-checkpoints-resume-and-safe-rollback) | `pending` |
 | Task 5 | [Compose OpenCode JSON/JSONC without overwriting user entries](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-5-compose-opencode-jsonjsonc-without-overwriting-user-entries) | `pending` |
@@ -38,7 +38,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 
 ## Estado actual
 
-- Tarea activa: [Task 2 — Build the safe process runner and public command router](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-2-build-the-safe-process-runner-and-public-command-router) (`in_progress`).
+- Tarea activa: ninguna.
 - Siguiente tarea: [Task 3 — Implement Windows preflight and confirmed prerequisite installation](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-3-implement-windows-preflight-and-confirmed-prerequisite-installation) (`pending`).
 
 ## Checkpoints
@@ -54,6 +54,18 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
   - `pnpm test:all`: `103/103`.
   - Spec: `APPROVED`.
   - Quality: `APPROVED`.
+
+### 2026-06-18 — Task 2
+
+- Status: `completed`.
+- Commits: `1a2c5d6`, `a771a49`.
+- Tests:
+  - TDD focalizado: `10/10`.
+  - `pnpm test:powershell`: `38/38`.
+  - `pnpm test:all`: bloqueado después de `VALIDATE PASS` por el falso positivo conocido del sanitizer que interpreta el sufijo de un anchor `task-N-*` como una clave con prefijo `sk-`.
+- Reviews:
+  - Self-review: `APPROVED`.
+  - Reviews externas: `pending`.
 
 ## Decisiones
 
