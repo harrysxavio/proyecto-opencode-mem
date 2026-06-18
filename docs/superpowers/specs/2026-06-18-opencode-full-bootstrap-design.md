@@ -56,7 +56,7 @@ The public interface is one beginner-facing command with explicit verbs:
 .\installer\bootstrap.ps1 doctor
 .\installer\bootstrap.ps1 status
 .\installer\bootstrap.ps1 configure
-.\installer\bootstrap.ps1 onboard -Project C:\path\to\project
+.\installer\bootstrap.ps1 onboard -Project ./path/to/project
 .\installer\bootstrap.ps1 rollback
 ```
 
@@ -293,7 +293,7 @@ The result is generated from doctor evidence, never inferred only from the prese
 After a ready result, the installer offers but does not force:
 
 ```powershell
-.\installer\bootstrap.ps1 onboard -Project C:\path\to\project
+.\installer\bootstrap.ps1 onboard -Project ./path/to/project
 ```
 
 Onboarding uses Graphify plus the `onboard` subagent to build a compact project index and initial operating context. It does not edit application code, does not block global installation, and is safe to skip.
