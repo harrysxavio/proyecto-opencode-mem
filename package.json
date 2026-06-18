@@ -17,7 +17,9 @@
     "rollback:plan": "node scripts/rollback.mjs --plan",
     "export:inventory": "node scripts/export-inventory.mjs",
     "skills:registry": "node scripts/skill-registry-generate.mjs",
-    "context:check": "node scripts/context-pack-check.mjs"
+    "context:check": "node scripts/context-pack-check.mjs",
+    "memory:lint": "node scripts/memory-lint.mjs",
+    "tokens:report": "node scripts/token-budget-report.mjs"
   },
   "engines": {
     "node": ">=20"

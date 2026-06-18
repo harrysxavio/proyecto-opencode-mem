@@ -306,7 +306,7 @@ git commit -m "feat: add context pack validator"
 - Create: `tests/fixtures/memory-lint/`
 - Modify: `package.json`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Memory lint must detect:
 - secret-like strings;
@@ -319,28 +319,28 @@ Token report must output:
 - largest files by character count;
 - recommended lazy-load candidates.
 
-- [ ] **Step 2: Implement minimal scripts**
+- [x] **Step 2: Implement minimal scripts**
 
 Keep them deterministic and offline. No model calls.
 
-- [ ] **Step 3: Add package scripts**
+- [x] **Step 3: Add package scripts**
 
 ```json
 "memory:lint": "node scripts/memory-lint.mjs",
 "tokens:report": "node scripts/token-budget-report.mjs"
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```powershell
 node --test tests/unit/memory-lint.test.mjs tests/unit/token-budget-report.test.mjs
-pnpm memory:lint tests/fixtures/memory-lint
-pnpm tokens:report
+npm run memory:lint -- tests/fixtures/memory-lint
+npm run tokens:report
 ```
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add scripts/memory-lint.mjs scripts/token-budget-report.mjs tests/unit/memory-lint.test.mjs tests/unit/token-budget-report.test.mjs tests/fixtures/memory-lint package.json
