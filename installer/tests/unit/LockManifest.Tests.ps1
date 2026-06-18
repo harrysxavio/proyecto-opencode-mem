@@ -41,6 +41,8 @@ Describe 'components.lock.json contract' {
 
     It 'defines safe structured installation and verification metadata' {
         foreach ($component in $lock.components) {
+            $component.required | Should -BeOfType [bool]
+            @($component.ownedTargets).GetType().Name | Should -Be 'Object[]'
             @($component.dependencies).GetType().Name | Should -Be 'Object[]'
             $component.install.command | Should -Not -BeNullOrEmpty
             $component.install.command | Should -Not -Match '[;&|]'
@@ -92,6 +94,35 @@ Describe 'Read-ComponentLock validation' {
         { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_SCHEMA_VERSION*'
     }
 
+    It 'rejects the wrong kit version with a stable code' {
+        $document.kitVersion = '0.2.0'
+        $path = Join-Path $TestDrive 'kit-version.json'
+        $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_KIT_VERSION_INVALID*'
+    }
+
+    It 'rejects any component count other than 15' {
+        $document.components = @($document.components | Select-Object -First 14)
+        $path = Join-Path $TestDrive 'component-count.json'
+        $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_COMPONENT_COUNT_INVALID*'
+    }
+
+    It 'rejects pack extras and omissions with a stable code' {
+        foreach ($case in @(
+            @{ Name = 'core-extra'; Pack = 'core'; Value = @($document.packs.core) + 'browserbase' },
+            @{ Name = 'core-omission'; Pack = 'core'; Value = @($document.packs.core | Select-Object -Skip 1) },
+            @{ Name = 'authenticated-extra'; Pack = 'authenticated'; Value = @($document.packs.authenticated) + 'git' },
+            @{ Name = 'authenticated-omission'; Pack = 'authenticated'; Value = @($document.packs.authenticated | Select-Object -Skip 1) }
+        )) {
+            $candidate = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -Depth 30
+            $candidate.packs.($case.Pack) = $case.Value
+            $path = Join-Path $TestDrive "$($case.Name).json"
+            $candidate | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+            { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_PACK_INVALID*'
+        }
+    }
+
     It 'rejects the wrong platform with a stable code' {
         $document.platform = 'linux'
         $path = Join-Path $TestDrive 'platform.json'
@@ -113,11 +144,37 @@ Describe 'Read-ComponentLock validation' {
         { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_SCHEMA*'
     }
 
-    It 'rejects missing references with stable codes' {
+    It 'rejects missing or non-boolean required metadata' {
+        $document.components[0].PSObject.Properties.Remove('required')
+        $path = Join-Path $TestDrive 'required-missing.json'
+        $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_COMPONENT_REQUIRED_INVALID*'
+
+        $document = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -Depth 30
+        $document.components[0].required = 'true'
+        $path = Join-Path $TestDrive 'required-type.json'
+        $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_COMPONENT_REQUIRED_INVALID*'
+    }
+
+    It 'rejects missing or non-array ownership metadata' {
+        $document.components[0].PSObject.Properties.Remove('ownedTargets')
+        $path = Join-Path $TestDrive 'ownership-missing.json'
+        $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_COMPONENT_OWNERSHIP_INVALID*'
+
+        $document = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -Depth 30
+        $document.components[0].ownedTargets = 'bin/git.exe'
+        $path = Join-Path $TestDrive 'ownership-type.json'
+        $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_COMPONENT_OWNERSHIP_INVALID*'
+    }
+
+    It 'rejects changed pack membership and missing dependency references with stable codes' {
         $document.packs.core[0] = 'missing-pack-component'
         $path = Join-Path $TestDrive 'pack-reference.json'
         $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
-        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_UNKNOWN_REFERENCE*'
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_PACK_INVALID*'
 
         $document = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -Depth 30
         $document.components[0].dependencies = @('missing-dependency')

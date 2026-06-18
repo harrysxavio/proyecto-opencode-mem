@@ -31,14 +31,27 @@ function Read-ComponentLock {
         Throw-LockError 'LOCK_JSON' "Cannot parse lock file '$resolvedPath'."
     }
 
-    foreach ($property in @('schemaVersion', 'platform', 'packs', 'components')) {
+    foreach ($property in @('schemaVersion', 'kitVersion', 'platform', 'packs', 'components')) {
         if (-not (Test-LockProperty $document $property)) { Throw-LockError 'LOCK_SCHEMA' "Missing top-level property '$property'." }
     }
     if ($document.schemaVersion -ne 1) { Throw-LockError 'LOCK_SCHEMA_VERSION' 'schemaVersion must be 1.' }
+    if ($document.kitVersion -ne '0.2.0-rc.1') { Throw-LockError 'LOCK_KIT_VERSION_INVALID' 'kitVersion must be 0.2.0-rc.1.' }
     if ($document.platform -ne 'windows-powershell') { Throw-LockError 'LOCK_PLATFORM' 'platform must be windows-powershell.' }
     if ($null -eq $document.packs -or $document.components -isnot [array]) { Throw-LockError 'LOCK_SCHEMA' 'packs and components are required.' }
+    if ($document.components.Count -ne 15) { Throw-LockError 'LOCK_COMPONENT_COUNT_INVALID' 'components must contain exactly 15 entries.' }
     foreach ($packName in @('core', 'authenticated')) {
         if (-not (Test-LockProperty $document.packs $packName)) { Throw-LockError 'LOCK_SCHEMA' "Missing pack '$packName'." }
+    }
+    $expectedPacks = @{
+        core = @('git', 'node', 'pnpm', 'python', 'uv', 'opencode', 'engram', 'graphify', 'context7', 'playwright', 'runtime-assets')
+        authenticated = @('github', 'supabase', 'notebooklm', 'browserbase')
+    }
+    foreach ($packName in @('core', 'authenticated')) {
+        $actual = $document.packs.$packName
+        $expected = $expectedPacks[$packName]
+        if ($actual -isnot [array] -or $actual.Count -ne $expected.Count -or (($actual -join "`u{001f}") -cne ($expected -join "`u{001f}"))) {
+            Throw-LockError 'LOCK_PACK_INVALID' "Pack '$packName' does not match the schema 1 contract."
+        }
     }
 
     $ids = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
@@ -50,6 +63,12 @@ function Read-ComponentLock {
             if (-not (Test-LockProperty $component.install $property)) { Throw-LockError 'LOCK_SCHEMA' "Component '$($component.id)' install is missing '$property'." }
         }
         if (-not (Test-LockProperty $component.source 'kind')) { Throw-LockError 'LOCK_SCHEMA' "Component '$($component.id)' source is missing 'kind'." }
+        if (-not (Test-LockProperty $component 'required') -or $component.required -isnot [bool]) {
+            Throw-LockError 'LOCK_COMPONENT_REQUIRED_INVALID' "Component '$($component.id)' required must be boolean."
+        }
+        if (-not (Test-LockProperty $component 'ownedTargets') -or $component.ownedTargets -isnot [array]) {
+            Throw-LockError 'LOCK_COMPONENT_OWNERSHIP_INVALID' "Component '$($component.id)' ownedTargets must be an array."
+        }
         if ([string]::IsNullOrWhiteSpace($component.id)) { Throw-LockError 'LOCK_COMPONENT_ID' 'Every component requires an ID.' }
         if (-not $ids.Add([string]$component.id)) { Throw-LockError 'LOCK_DUPLICATE_ID' "Duplicate component ID '$($component.id)'." }
         if ([string]::IsNullOrWhiteSpace($component.version) -or $component.version -match '(?i)latest' -or $component.version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {

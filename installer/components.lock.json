@@ -47,6 +47,10 @@
       },
       "verificationIds": [
         "git.version"
+      ],
+      "required": true,
+      "ownedTargets": [
+        "command:git"
       ]
     },
     {
@@ -72,6 +76,11 @@
       },
       "verificationIds": [
         "node.version"
+      ],
+      "required": true,
+      "ownedTargets": [
+        "command:node",
+        "command:npm"
       ]
     },
     {
@@ -96,6 +105,10 @@
       },
       "verificationIds": [
         "pnpm.version"
+      ],
+      "required": true,
+      "ownedTargets": [
+        "command:pnpm"
       ]
     },
     {
@@ -121,6 +134,10 @@
       },
       "verificationIds": [
         "python.version"
+      ],
+      "required": true,
+      "ownedTargets": [
+        "command:python"
       ]
     },
     {
@@ -146,6 +163,10 @@
       },
       "verificationIds": [
         "uv.version"
+      ],
+      "required": true,
+      "ownedTargets": [
+        "command:uv"
       ]
     },
     {
@@ -171,6 +192,10 @@
       },
       "verificationIds": [
         "opencode.version"
+      ],
+      "required": true,
+      "ownedTargets": [
+        "command:opencode"
       ]
     },
     {
@@ -194,6 +219,10 @@
       "verificationIds": [
         "engram.version",
         "engram.persist"
+      ],
+      "required": true,
+      "ownedTargets": [
+        "command:engram"
       ]
     },
     {
@@ -220,6 +249,10 @@
       "verificationIds": [
         "graphify.version",
         "graphify.query"
+      ],
+      "required": true,
+      "ownedTargets": [
+        "command:graphify"
       ]
     },
     {
@@ -246,6 +279,10 @@
       "verificationIds": [
         "context7.version",
         "mcp.context7"
+      ],
+      "required": true,
+      "ownedTargets": [
+        "command:context7-mcp"
       ]
     },
     {
@@ -272,6 +309,10 @@
       "verificationIds": [
         "playwright.version",
         "mcp.playwright"
+      ],
+      "required": true,
+      "ownedTargets": [
+        "command:playwright-mcp"
       ]
     },
     {
@@ -296,6 +337,10 @@
       },
       "verificationIds": [
         "runtime-assets.layout"
+      ],
+      "required": true,
+      "ownedTargets": [
+        "path:${OPENCODE_KIT_ROOT}"
       ]
     },
     {
@@ -331,7 +376,11 @@
         "environment": [
           "GITHUB_TOKEN"
         ]
-      }
+      },
+      "required": false,
+      "ownedTargets": [
+        "config:mcp.github"
+      ]
     },
     {
       "id": "supabase",
@@ -365,7 +414,11 @@
         "environment": [
           "SUPABASE_ACCESS_TOKEN"
         ]
-      }
+      },
+      "required": false,
+      "ownedTargets": [
+        "config:mcp.supabase"
+      ]
     },
     {
       "id": "notebooklm",
@@ -400,7 +453,11 @@
         "environment": [
           "NOTEBOOKLM_AUTH_JSON"
         ]
-      }
+      },
+      "required": false,
+      "ownedTargets": [
+        "config:mcp.notebooklm"
+      ]
     },
     {
       "id": "browserbase",
@@ -435,7 +492,11 @@
           "BROWSERBASE_API_KEY",
           "BROWSERBASE_PROJECT_ID"
         ]
-      }
+      },
+      "required": false,
+      "ownedTargets": [
+        "config:mcp.browserbase"
+      ]
     }
   ]
 }
