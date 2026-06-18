@@ -93,7 +93,7 @@ function Read-ComponentLock {
             Throw-LockError 'LOCK_VERSION' "Component '$($component.id)' requires an exact version."
         }
         if (-not (Test-LockStringArray $component.dependencies)) { Throw-LockError 'LOCK_DEPENDENCIES_INVALID' "Component '$($component.id)' dependencies must be a string array." }
-        if ([string]::IsNullOrWhiteSpace($component.install.command) -or $component.install.command -match '[;&|]') {
+        if ($component.install.command -isnot [string] -or [string]::IsNullOrWhiteSpace($component.install.command) -or $component.install.command -match '[;&|]') {
             Throw-LockError 'LOCK_INSTALL_COMMAND' "Component '$($component.id)' has an unsafe install command."
         }
         if (-not (Test-LockStringArray $component.install.arguments)) { Throw-LockError 'LOCK_INSTALL_ARGUMENTS_INVALID' "Component '$($component.id)' install arguments must be a string array." }
@@ -128,6 +128,10 @@ function Read-ComponentLock {
                 elseif ($component.integrityStatus -eq 'verified') {
                     if (-not (Test-LockProperty $component.source 'url') -or -not (Test-LockProperty $component.source 'sha256')) {
                         Throw-LockError 'LOCK_SOURCE_INTEGRITY' "Component '$($component.id)' is missing GitHub release integrity metadata."
+                    }
+                    if ($component.source.url -isnot [string] -or [string]::IsNullOrWhiteSpace($component.source.url) -or
+                        $component.source.sha256 -isnot [string] -or [string]::IsNullOrWhiteSpace($component.source.sha256)) {
+                        Throw-LockError 'LOCK_SOURCE_INTEGRITY' "Component '$($component.id)' GitHub release URL and hash must be strings."
                     }
                     $versionToken = [regex]::Escape([string]$component.version)
                     if ($component.source.url -notmatch '^https://' -or $component.source.url -notmatch $versionToken -or $component.source.sha256 -notmatch '^[0-9a-f]{64}$') {

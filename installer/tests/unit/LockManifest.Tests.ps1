@@ -248,6 +248,19 @@ Describe 'Read-ComponentLock validation' {
         { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_INSTALL_ARGUMENTS*'
     }
 
+    It 'rejects non-string install commands' {
+        foreach ($case in @(
+            @{ Name = 'array'; Value = @('winget') },
+            @{ Name = 'object'; Value = [pscustomobject]@{ executable = 'winget' } }
+        )) {
+            $candidate = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -Depth 30
+            $candidate.components[0].install.command = $case.Value
+            $path = Join-Path $TestDrive "command-$($case.Name).json"
+            $candidate | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+            { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_INSTALL_COMMAND*'
+        }
+    }
+
     It 'rejects scalar and non-string dependency or ownership arrays' {
         $document.components[0].dependencies = 'node'
         $path = Join-Path $TestDrive 'dependencies-scalar.json'
@@ -295,5 +308,29 @@ Describe 'Read-ComponentLock validation' {
         $path = Join-Path $TestDrive 'hash.json'
         $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
         { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_SOURCE_INTEGRITY*'
+    }
+
+    It 'rejects non-string GitHub release URLs and hashes' {
+        $validUrl = 'https://github.com/example/engram/releases/download/v1.16.3/engram.exe'
+        $validHash = ('a' * 64) -join ''
+        foreach ($case in @(
+            @{ Name = 'url-array'; Field = 'url'; Value = @($validUrl) },
+            @{ Name = 'url-object'; Field = 'url'; Value = [pscustomobject]@{ href = $validUrl } },
+            @{ Name = 'url-number'; Field = 'url'; Value = 42 },
+            @{ Name = 'hash-array'; Field = 'sha256'; Value = @($validHash) },
+            @{ Name = 'hash-object'; Field = 'sha256'; Value = [pscustomobject]@{ value = $validHash } },
+            @{ Name = 'hash-number'; Field = 'sha256'; Value = 42 }
+        )) {
+            $candidate = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -Depth 30
+            $engram = $candidate.components | Where-Object id -EQ 'engram'
+            $engram.integrityStatus = 'verified'
+            $engram.install.allowed = $true
+            $engram.source | Add-Member -NotePropertyName url -NotePropertyValue $validUrl
+            $engram.source | Add-Member -NotePropertyName sha256 -NotePropertyValue $validHash
+            $engram.source.($case.Field) = $case.Value
+            $path = Join-Path $TestDrive "$($case.Name).json"
+            $candidate | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+            { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_SOURCE_INTEGRITY*'
+        }
     }
 }
