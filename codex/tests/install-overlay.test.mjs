@@ -7,8 +7,8 @@ import {
   buildCodexOverlayPlan,
   installCodexOverlay,
   validateCodexOverlayTarget
-} from "../../scripts/install-codex-overlay.mjs";
-import { runCodexDoctor } from "../../scripts/codex-doctor.mjs";
+} from "../../codex/scripts/install-overlay.mjs";
+import { runCodexDoctor } from "../../codex/scripts/doctor.mjs";
 
 test("buildCodexOverlayPlan reports dry-run actions without writing files", async () => {
   const target = await mkdtemp(path.join(os.tmpdir(), "codex-overlay-"));

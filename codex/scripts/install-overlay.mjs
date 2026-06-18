@@ -2,11 +2,11 @@
 import { access, cp, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { repoRoot } from "./manifest-utils.mjs";
+import { repoRoot } from "../../scripts/manifest-utils.mjs";
 
 const overlayFiles = [
   {
-    source: "templates/codex/AGENTS.codex.example.md",
+    source: "codex/manager.template.md",
     destination: "AGENTS.md"
   },
   {

@@ -2,7 +2,7 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { repoRoot } from "./manifest-utils.mjs";
+import { repoRoot } from "../../scripts/manifest-utils.mjs";
 
 function toPosix(value) {
   return value.split(path.sep).join("/");

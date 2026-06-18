@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { buildTokenBudgetReport } from "../../scripts/token-budget-report.mjs";
+import { buildTokenBudgetReport } from "../../codex/scripts/token-budget-report.mjs";
 
 test("buildTokenBudgetReport estimates largest files and lazy-load candidates", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "token-report-"));

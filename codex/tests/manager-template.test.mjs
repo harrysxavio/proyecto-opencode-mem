@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { repoRoot } from "../../scripts/manifest-utils.mjs";
 
-const templatePath = path.join(repoRoot, "templates/codex/AGENTS.codex.example.md");
+const templatePath = path.join(repoRoot, "codex/manager.template.md");
 const guidePath = path.join(repoRoot, "docs/codex-runtime.md");
 
 async function readProjectFile(filePath) {

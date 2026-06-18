@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { lintMemoryPath } from "../../scripts/memory-lint.mjs";
+import { lintMemoryPath } from "../../codex/scripts/memory-lint.mjs";
 
 async function writeMemory(root, name, content) {
   const filePath = path.join(root, name);

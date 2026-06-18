@@ -2,7 +2,7 @@
 import { access, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateCodexOverlayTarget } from "./install-codex-overlay.mjs";
+import { validateCodexOverlayTarget } from "./install-overlay.mjs";
 
 function argValue(name, fallback) {
   const index = process.argv.indexOf(name);

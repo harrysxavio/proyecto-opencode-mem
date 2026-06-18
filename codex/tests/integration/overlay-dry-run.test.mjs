@@ -4,13 +4,13 @@ import { mkdtemp, readdir } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
-import { repoRoot } from "../../scripts/manifest-utils.mjs";
+import { repoRoot } from "../../../scripts/manifest-utils.mjs";
 
 test("codex overlay dry-run writes nothing to target", async () => {
   const target = await mkdtemp(path.join(os.tmpdir(), "codex-overlay-dry-run-"));
   const result = spawnSync(
     process.execPath,
-    ["scripts/install-codex-overlay.mjs", "--dry-run", "--target", target],
+    ["codex/scripts/install-overlay.mjs", "--dry-run", "--target", target],
     { cwd: repoRoot, encoding: "utf8" }
   );
   const entries = await readdir(target);
@@ -24,7 +24,7 @@ test("codex overlay dry-run accepts positional target for npm-run compatibility"
   const target = await mkdtemp(path.join(os.tmpdir(), "codex-overlay-dry-run-"));
   const result = spawnSync(
     process.execPath,
-    ["scripts/install-codex-overlay.mjs", "--dry-run", target],
+    ["codex/scripts/install-overlay.mjs", "--dry-run", target],
     { cwd: repoRoot, encoding: "utf8" }
   );
 
@@ -33,7 +33,7 @@ test("codex overlay dry-run accepts positional target for npm-run compatibility"
 });
 
 test("codex overlay real install refuses missing explicit target", () => {
-  const result = spawnSync(process.execPath, ["scripts/install-codex-overlay.mjs"], {
+  const result = spawnSync(process.execPath, ["codex/scripts/install-overlay.mjs"], {
     cwd: repoRoot,
     encoding: "utf8"
   });
@@ -44,13 +44,13 @@ test("codex overlay real install refuses missing explicit target", () => {
 
 test("codex doctor accepts positional target for npm-run compatibility", async () => {
   const target = await mkdtemp(path.join(os.tmpdir(), "codex-overlay-doctor-"));
-  const install = spawnSync(process.execPath, ["scripts/install-codex-overlay.mjs", target], {
+  const install = spawnSync(process.execPath, ["codex/scripts/install-overlay.mjs", target], {
     cwd: repoRoot,
     encoding: "utf8"
   });
   assert.equal(install.status, 0, install.stderr);
 
-  const doctor = spawnSync(process.execPath, ["scripts/codex-doctor.mjs", target], {
+  const doctor = spawnSync(process.execPath, ["codex/scripts/doctor.mjs", target], {
     cwd: repoRoot,
     encoding: "utf8"
   });

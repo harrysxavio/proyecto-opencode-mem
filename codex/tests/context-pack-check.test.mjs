@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { validateContextPackFile } from "../../scripts/context-pack-check.mjs";
+import { validateContextPackFile } from "../../codex/scripts/context-pack-check.mjs";
 
 async function writePack(root, name, pack) {
   const filePath = path.join(root, name);

@@ -2,7 +2,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { repoRoot } from "./manifest-utils.mjs";
+import { repoRoot } from "../../scripts/manifest-utils.mjs";
 
 const includedExtensions = new Set([".md", ".json", ".jsonc", ".mjs", ".js"]);
 const ignoredDirs = new Set([".git", "node_modules", "tests/tmp"]);

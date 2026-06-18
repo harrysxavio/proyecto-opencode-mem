@@ -4,8 +4,8 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { installCodexOverlay } from "../../scripts/install-codex-overlay.mjs";
-import { rollbackCodexOverlay, buildCodexRollbackPlan } from "../../scripts/rollback-codex-overlay.mjs";
+import { installCodexOverlay } from "../../codex/scripts/install-overlay.mjs";
+import { rollbackCodexOverlay, buildCodexRollbackPlan } from "../../codex/scripts/rollback-overlay.mjs";
 
 test("buildCodexRollbackPlan uses last install metadata by default", async () => {
   const target = await mkdtemp(path.join(os.tmpdir(), "codex-rollback-"));

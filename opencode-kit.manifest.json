@@ -162,7 +162,7 @@
       "id": "codex-manager-template",
       "type": "agent-template",
       "paths": [
-        "templates/codex/AGENTS.codex.example.md"
+        "codex/manager.template.md"
       ]
     },
     {

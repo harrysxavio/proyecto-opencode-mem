@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { generateSkillRegistry } from "../../scripts/skill-registry-generate.mjs";
+import { generateSkillRegistry } from "../../codex/scripts/skill-registry-generate.mjs";
 
 async function makeFixtureSkill(root, name, description) {
   const dir = path.join(root, "skills", name);
