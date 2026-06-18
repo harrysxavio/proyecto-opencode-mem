@@ -33,10 +33,15 @@ test("installCodexOverlay writes overlay files and rollback metadata into fixtur
   const result = await installCodexOverlay({ target, dryRun: false });
 
   const agents = await readFile(path.join(target, "AGENTS.md"), "utf8");
+  const importedSkill = await readFile(
+    path.join(target, "skills", "opencode-runtime-kit", "work-unit-commits", "SKILL.md"),
+    "utf8"
+  );
   const metadata = JSON.parse(await readFile(path.join(target, ".opencode-kit", "last-install.json"), "utf8"));
 
   assert.equal(result.dryRun, false);
   assert.match(agents, /Manager is the single primary orchestrator/);
+  assert.match(importedSkill, /reviewable work units/i);
   assert.ok(metadata.backupId);
   assert.ok(metadata.files.includes("AGENTS.md"));
 });

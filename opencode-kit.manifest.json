@@ -4,27 +4,51 @@
   "profiles": {
     "minimal": {
       "description": "Base documentation and templates only",
-      "components": ["docs-core", "templates-core"]
+      "components": [
+        "docs-core",
+        "templates-core"
+      ]
     },
     "agents": {
       "description": "Manager template and agent governance",
-      "components": ["docs-core", "templates-core", "manager-template"]
+      "components": [
+        "docs-core",
+        "templates-core",
+        "manager-template"
+      ]
     },
     "sdd": {
       "description": "SDD subagent templates and routing contracts",
-      "components": ["docs-core", "templates-core", "sdd-templates"]
+      "components": [
+        "docs-core",
+        "templates-core",
+        "sdd-templates"
+      ]
     },
     "memory-enabled": {
       "description": "Engram memory governance, Noise Gate and mem_context templates",
-      "components": ["docs-core", "templates-core", "engram-template", "memory-governance"]
+      "components": [
+        "docs-core",
+        "templates-core",
+        "engram-template",
+        "memory-governance"
+      ]
     },
     "ponytail-code-gate": {
       "description": "Ponytail code-task guidance, no plugin by default",
-      "components": ["docs-core", "templates-core", "ponytail-guidance"]
+      "components": [
+        "docs-core",
+        "templates-core",
+        "ponytail-guidance"
+      ]
     },
     "gentle-alignment": {
       "description": "gentle-ai alignment-only docs and architecture patterns",
-      "components": ["docs-core", "templates-core", "gentle-alignment-docs"]
+      "components": [
+        "docs-core",
+        "templates-core",
+        "gentle-alignment-docs"
+      ]
     },
     "full": {
       "description": "Manager + SDD + memory governance + Ponytail guidance; no gentle-ai runtime",
@@ -42,7 +66,12 @@
     },
     "codex": {
       "description": "Codex-first Manager, skills and memory governance overlay",
-      "components": ["docs-core", "codex-manager-template", "codex-skills", "codex-memory-governance"]
+      "components": [
+        "docs-core",
+        "codex-manager-template",
+        "codex-skills",
+        "codex-memory-governance"
+      ]
     },
     "codex-full": {
       "description": "Codex-first full runtime kit with Manager, SDD, memory, context packs and validation harness",
@@ -61,62 +90,111 @@
     {
       "id": "docs-core",
       "type": "docs",
-      "paths": ["README.md", "docs/architecture.md", "docs/install.md"]
+      "paths": [
+        "README.md",
+        "docs/architecture.md",
+        "docs/install.md"
+      ]
     },
     {
       "id": "templates-core",
       "type": "template",
-      "paths": ["templates/opencode.example.jsonc", "templates/AGENTS.example.md", "templates/env.example"]
+      "paths": [
+        "templates/opencode.example.jsonc",
+        "templates/AGENTS.example.md",
+        "templates/env.example"
+      ]
     },
     {
       "id": "manager-template",
       "type": "agent-template",
-      "paths": ["agents/manager/manager.template.md"]
+      "paths": [
+        "agents/manager/manager.template.md"
+      ]
     },
     {
       "id": "sdd-templates",
       "type": "agent-template",
-      "paths": ["agents/sdd"]
+      "paths": [
+        "agents/sdd"
+      ]
     },
     {
       "id": "engram-template",
       "type": "plugin-template",
-      "paths": ["plugins/engram.template.ts"]
+      "paths": [
+        "plugins/engram.template.ts"
+      ]
     },
     {
       "id": "memory-governance",
       "type": "docs",
-      "paths": ["docs/memory-governance.md"]
+      "paths": [
+        "docs/memory-governance.md"
+      ]
     },
     {
       "id": "ponytail-guidance",
       "type": "docs",
-      "paths": ["docs/manager.md", "templates/AGENTS.example.md"]
+      "paths": [
+        "docs/manager.md",
+        "templates/AGENTS.example.md"
+      ]
     },
     {
       "id": "gentle-alignment-docs",
       "type": "docs",
-      "paths": ["docs/architecture.md", "docs/manager.md"]
+      "paths": [
+        "docs/architecture.md",
+        "docs/manager.md"
+      ]
     },
     {
       "id": "validation-harness",
       "type": "script",
-      "paths": ["scripts/doctor.mjs", "scripts/validate.mjs", "scripts/sanitize-check.mjs"]
+      "paths": [
+        "scripts/doctor.mjs",
+        "scripts/validate.mjs",
+        "scripts/sanitize-check.mjs"
+      ]
     },
     {
       "id": "codex-manager-template",
       "type": "agent-template",
-      "paths": ["templates/codex/AGENTS.codex.example.md"]
+      "paths": [
+        "templates/codex/AGENTS.codex.example.md"
+      ]
     },
     {
       "id": "codex-skills",
       "type": "skill-template",
-      "paths": ["skills/manager-router", "skills/memory-governance", "skills/context-pack-builder", "skills/token-budgeter"]
+      "paths": [
+        "skills/manager-router",
+        "skills/memory-governance",
+        "skills/context-pack-builder",
+        "skills/token-budgeter",
+        "skills/work-unit-commits",
+        "skills/chained-pr",
+        "skills/branch-pr",
+        "skills/issue-creation",
+        "skills/judgment-day",
+        "skills/deploy-security-gate",
+        "skills/cognitive-doc-design",
+        "skills/flow-diagram",
+        "skills/web-design-guidelines",
+        "skills/skill-improver",
+        "skills/bigquery-table-cleaning",
+        "skills/sandbox-data-loader",
+        "skills/sql-learning"
+      ]
     },
     {
       "id": "codex-memory-governance",
       "type": "docs",
-      "paths": ["docs/codex-runtime.md", "docs/memory-governance.md"]
+      "paths": [
+        "docs/codex-runtime.md",
+        "docs/memory-governance.md"
+      ]
     }
   ]
 }

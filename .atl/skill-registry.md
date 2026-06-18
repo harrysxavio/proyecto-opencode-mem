@@ -4,7 +4,20 @@
 
 | Skill | Trigger / description | Path |
 |---|---|---|
+| bigquery-table-cleaning | No description provided | skills/bigquery-table-cleaning/SKILL.md |
+| branch-pr | No description provided | skills/branch-pr/SKILL.md |
+| chained-pr | No description provided | skills/chained-pr/SKILL.md |
+| cognitive-doc-design | No description provided | skills/cognitive-doc-design/SKILL.md |
 | context-pack-builder | Build minimal context packs for broad work, SDD phases, research, code review, and memory-heavy requests. | skills/context-pack-builder/SKILL.md |
+| deploy-security-gate | No description provided | skills/deploy-security-gate/SKILL.md |
+| flow-diagram | No description provided | skills/flow-diagram/SKILL.md |
+| issue-creation | No description provided | skills/issue-creation/SKILL.md |
+| judgment-day | No description provided | skills/judgment-day/SKILL.md |
 | manager-router | Classify requests, choose the smallest safe route, and decide when Codex should use memory, docs, skills, tools, SDD, or subagents. | skills/manager-router/SKILL.md |
 | memory-governance | Retrieve, write, update, and reject memory using evidence, scope, sensitivity, and token discipline. | skills/memory-governance/SKILL.md |
+| sandbox-data-loader | No description provided | skills/sandbox-data-loader/SKILL.md |
+| skill-improver | No description provided | skills/skill-improver/SKILL.md |
+| sql-learning | No description provided | skills/sql-learning/SKILL.md |
 | token-budgeter | Estimate and reduce fixed and dynamic token cost by moving detail into lazy-loaded docs, skills, scripts, and context packs. | skills/token-budgeter/SKILL.md |
+| web-design-guidelines | No description provided | skills/web-design-guidelines/SKILL.md |
+| work-unit-commits | No description provided | skills/work-unit-commits/SKILL.md |

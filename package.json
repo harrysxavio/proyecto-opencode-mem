@@ -22,7 +22,9 @@
     "tokens:report": "node scripts/token-budget-report.mjs",
     "install:codex:dry-run": "node scripts/install-codex-overlay.mjs --dry-run",
     "codex:doctor": "node scripts/codex-doctor.mjs",
-    "install:opencode:dry-run": "node scripts/install-opencode-overlay.mjs --dry-run"
+    "install:opencode:dry-run": "node scripts/install-opencode-overlay.mjs --dry-run",
+    "rollback:codex:dry-run": "node scripts/rollback-codex-overlay.mjs --dry-run",
+    "rollback:codex": "node scripts/rollback-codex-overlay.mjs"
   },
   "engines": {
     "node": ">=20"

@@ -28,6 +28,58 @@ const overlayFiles = [
   {
     source: "skills/token-budgeter",
     destination: "skills/opencode-runtime-kit/token-budgeter"
+  },
+  {
+    source: "skills/work-unit-commits",
+    destination: "skills/opencode-runtime-kit/work-unit-commits"
+  },
+  {
+    source: "skills/chained-pr",
+    destination: "skills/opencode-runtime-kit/chained-pr"
+  },
+  {
+    source: "skills/branch-pr",
+    destination: "skills/opencode-runtime-kit/branch-pr"
+  },
+  {
+    source: "skills/issue-creation",
+    destination: "skills/opencode-runtime-kit/issue-creation"
+  },
+  {
+    source: "skills/judgment-day",
+    destination: "skills/opencode-runtime-kit/judgment-day"
+  },
+  {
+    source: "skills/deploy-security-gate",
+    destination: "skills/opencode-runtime-kit/deploy-security-gate"
+  },
+  {
+    source: "skills/cognitive-doc-design",
+    destination: "skills/opencode-runtime-kit/cognitive-doc-design"
+  },
+  {
+    source: "skills/flow-diagram",
+    destination: "skills/opencode-runtime-kit/flow-diagram"
+  },
+  {
+    source: "skills/web-design-guidelines",
+    destination: "skills/opencode-runtime-kit/web-design-guidelines"
+  },
+  {
+    source: "skills/skill-improver",
+    destination: "skills/opencode-runtime-kit/skill-improver"
+  },
+  {
+    source: "skills/bigquery-table-cleaning",
+    destination: "skills/opencode-runtime-kit/bigquery-table-cleaning"
+  },
+  {
+    source: "skills/sandbox-data-loader",
+    destination: "skills/opencode-runtime-kit/sandbox-data-loader"
+  },
+  {
+    source: "skills/sql-learning",
+    destination: "skills/opencode-runtime-kit/sql-learning"
   }
 ];
 
