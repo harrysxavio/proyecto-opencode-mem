@@ -58,14 +58,15 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 ### 2026-06-18 — Task 2
 
 - Status: `completed`.
-- Commits: `1a2c5d6`, `a771a49`.
+- Commits: `1a2c5d6`, `a771a49`, `359dc90`, `be6fbbe`.
 - Tests:
-  - TDD focalizado: `10/10`.
-  - `pnpm test:powershell`: `38/38`.
-  - `pnpm test:all`: bloqueado después de `VALIDATE PASS` por el falso positivo conocido del sanitizer que interpreta el sufijo de un anchor `task-N-*` como una clave con prefijo `sk-`.
+  - TDD focalizado: `12/12`.
+  - `pnpm test:powershell`: `40/40`.
+  - `pnpm test:all`: `109/109`.
 - Reviews:
   - Self-review: `APPROVED`.
-  - Reviews externas: `pending`.
+  - Spec: `APPROVED`.
+  - Quality: `pending` hasta re-review.
 
 ## Decisiones
 
