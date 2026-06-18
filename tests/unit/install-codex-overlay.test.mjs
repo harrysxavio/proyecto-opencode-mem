@@ -37,13 +37,19 @@ test("installCodexOverlay writes overlay files and rollback metadata into fixtur
     path.join(target, "skills", "opencode-runtime-kit", "work-unit-commits", "SKILL.md"),
     "utf8"
   );
+  const noiseGateSkill = await readFile(
+    path.join(target, "skills", "opencode-runtime-kit", "noise-gate", "SKILL.md"),
+    "utf8"
+  );
   const metadata = JSON.parse(await readFile(path.join(target, ".opencode-kit", "last-install.json"), "utf8"));
 
   assert.equal(result.dryRun, false);
   assert.match(agents, /Manager is the single primary orchestrator/);
   assert.match(importedSkill, /reviewable work units/i);
+  assert.match(noiseGateSkill, /Noise Gate/i);
   assert.ok(metadata.backupId);
   assert.ok(metadata.files.includes("AGENTS.md"));
+  assert.ok(metadata.files.includes("skills/opencode-runtime-kit/noise-gate"));
 });
 
 test("installCodexOverlay backs up existing overlay files before overwrite", async () => {

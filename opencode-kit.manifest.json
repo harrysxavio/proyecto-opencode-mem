@@ -171,6 +171,7 @@
       "paths": [
         "skills/manager-router",
         "skills/memory-governance",
+        "skills/noise-gate",
         "skills/context-pack-builder",
         "skills/token-budgeter",
         "skills/work-unit-commits",

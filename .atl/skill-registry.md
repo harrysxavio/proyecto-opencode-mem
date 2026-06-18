@@ -15,6 +15,7 @@
 | judgment-day | No description provided | skills/judgment-day/SKILL.md |
 | manager-router | Classify requests, choose the smallest safe route, and decide when Codex should use memory, docs, skills, tools, SDD, or subagents. | skills/manager-router/SKILL.md |
 | memory-governance | Retrieve, write, update, and reject memory using evidence, scope, sensitivity, and token discipline. | skills/memory-governance/SKILL.md |
+| noise-gate | Classify user prompts as instruction, question, confirmation, navigation, or noise before deciding what deserves memory. Use when Codex is about to save memory, summarize a session, compact context, or reduce noisy prompt capture inspired by the OpenCode Noise Gate design. | skills/noise-gate/SKILL.md |
 | sandbox-data-loader | No description provided | skills/sandbox-data-loader/SKILL.md |
 | skill-improver | No description provided | skills/skill-improver/SKILL.md |
 | sql-learning | No description provided | skills/sql-learning/SKILL.md |

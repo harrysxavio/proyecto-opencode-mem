@@ -51,3 +51,11 @@ test("manifest component paths stay portable", async () => {
     }
   }
 });
+
+test("manifest includes portable Codex Noise Gate skill", async () => {
+  const manifest = await loadManifest();
+  const codexSkills = manifest.components.find((component) => component.id === "codex-skills");
+
+  assert.ok(codexSkills, "missing codex-skills component");
+  assert.ok(codexSkills.paths.includes("skills/noise-gate"));
+});

@@ -22,6 +22,10 @@ const overlayFiles = [
     destination: "skills/opencode-runtime-kit/memory-governance"
   },
   {
+    source: "skills/noise-gate",
+    destination: "skills/opencode-runtime-kit/noise-gate"
+  },
+  {
     source: "skills/context-pack-builder",
     destination: "skills/opencode-runtime-kit/context-pack-builder"
   },
