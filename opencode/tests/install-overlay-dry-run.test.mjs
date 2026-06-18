@@ -6,12 +6,12 @@ import os from "node:os";
 import path from "node:path";
 import { repoRoot } from "../../scripts/manifest-utils.mjs";
 
-test("opencode adaptation doc forbids writing to the application install directory", async () => {
-  const doc = await readFile(path.join(repoRoot, "docs/opencode-adaptation.md"), "utf8");
+test("opencode manager template defines full orchestration protocol", async () => {
+  const doc = await readFile(path.join(repoRoot, "opencode/manager.template.md"), "utf8");
 
-  assert.match(doc, /do not write to `<OPENCODE_APP_INSTALL_DIR>`/i);
-  assert.match(doc, /Codex first/i);
-  assert.match(doc, /configuration overlay/i);
+  assert.match(doc, /Manager global/i);
+  assert.match(doc, /Clasificación de Solicitudes|Request Classification/i);
+  assert.match(doc, /SDD Pipeline/i);
 });
 
 test("opencode overlay dry-run writes nothing to target", async () => {

@@ -9,11 +9,12 @@ const repoRoot = path.resolve(__dirname, "..", "..");
 
 const REQUIRED_DOCS = [
   "docs/getting-started.md",
-  "docs/profiles.md",
   "docs/installation-targets.md",
   "docs/safety-and-sanitization.md",
-  "docs/phase-roadmap.md",
   "docs/decisions/0002-phase-documentation-standard.md",
+  "ARCHITECTURE.md",
+  "QUICKSTART_OPENCODE.md",
+  "QUICKSTART_CODEX.md",
 ];
 
 async function fileExists(filePath) {
@@ -78,11 +79,8 @@ describe("docs-check — README sections", () => {
 describe("docs-check — forbidden patterns", () => {
   const newDocs = [
     "docs/getting-started.md",
-    "docs/profiles.md",
     "docs/installation-targets.md",
     "docs/safety-and-sanitization.md",
-    "docs/phase-roadmap.md",
-    "docs/PHASE-1-DOCUMENTATION-AUDIT.md",
   ];
 
   for (const doc of newDocs) {
@@ -136,10 +134,8 @@ describe("docs-check — README accuracy", () => {
 describe("docs-check — doc accuracy", () => {
   const checkedDocs = [
     "docs/getting-started.md",
-    "docs/profiles.md",
     "docs/installation-targets.md",
     "docs/safety-and-sanitization.md",
-    "docs/phase-roadmap.md",
   ];
 
   for (const doc of checkedDocs) {

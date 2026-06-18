@@ -4,10 +4,10 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { repoRoot } from "../../scripts/manifest-utils.mjs";
 
-test("Engram template has memory governance sections and no personal paths", async () => {
-  const text = await readFile(path.join(repoRoot, "plugins", "engram.template.ts"), "utf8");
-  assert.match(text, /noiseGate/);
-  assert.match(text, /memContextGuidance/);
-  assert.match(text, /f4cScore/);
+test("Memory governance contract defines write rules, retrieval and quality", async () => {
+  const text = await readFile(path.join(repoRoot, "contracts", "memory-governance.md"), "utf8");
+  assert.match(text, /memoria persistente|persistent memory/i);
+  assert.match(text, /Reglas de escritura|write rules/i);
+  assert.match(text, /recupera|retrieval|recuperación/i);
   assert.equal(text.includes(["C:", "Users"].join("\\")), false);
 });

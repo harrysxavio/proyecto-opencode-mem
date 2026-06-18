@@ -19,7 +19,7 @@ function validPack(overrides = {}) {
     included: [
       {
         kind: "file",
-        ref: "docs/codex-runtime.md",
+        ref: "docs/codex/getting-started.md",
         reason: "Codex runtime guide defines the target behavior",
         sensitivity: "low"
       }
@@ -79,7 +79,7 @@ test("validateContextPackFile requires included kind, ref and reason", async () 
   const filePath = await writePack(
     root,
     "invalid-missing-included-fields.json",
-    validPack({ included: [{ kind: "doc", ref: "docs/codex-runtime.md" }] })
+    validPack({ included: [{ kind: "doc", ref: "docs/codex/getting-started.md" }] })
   );
 
   const result = await validateContextPackFile(filePath);

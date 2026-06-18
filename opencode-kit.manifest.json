@@ -14,24 +14,23 @@
       "components": [
         "docs-core",
         "templates-core",
-        "manager-template"
+        "manager-template-opencode"
       ]
     },
     "sdd": {
-      "description": "SDD subagent templates and routing contracts",
+      "description": "SDD pipeline contracts and routing",
       "components": [
         "docs-core",
         "templates-core",
-        "sdd-templates"
+        "sdd-pipeline-contract"
       ]
     },
     "memory-enabled": {
-      "description": "Engram memory governance, Noise Gate and mem_context templates",
+      "description": "Memory governance contracts, Noise Gate and retrieval",
       "components": [
         "docs-core",
         "templates-core",
-        "engram-template",
-        "memory-governance"
+        "memory-governance-contract"
       ]
     },
     "ponytail-code-gate": {
@@ -51,14 +50,15 @@
       ]
     },
     "full": {
-      "description": "Manager + SDD + memory governance + Ponytail guidance; no gentle-ai runtime",
+      "description": "All contracts, templates, skills and validation for both runtimes",
       "components": [
         "docs-core",
         "templates-core",
-        "manager-template",
-        "sdd-templates",
-        "engram-template",
-        "memory-governance",
+        "manager-template-opencode",
+        "manager-template-codex",
+        "manager-contract",
+        "sdd-pipeline-contract",
+        "memory-governance-contract",
         "ponytail-guidance",
         "gentle-alignment-docs",
         "validation-harness"
@@ -80,8 +80,8 @@
         "templates-core",
         "codex-manager-template",
         "codex-skills",
-        "sdd-templates",
-        "memory-governance",
+        "sdd-pipeline-contract",
+        "memory-governance-contract",
         "validation-harness"
       ]
     }
@@ -106,31 +106,38 @@
       ]
     },
     {
-      "id": "manager-template",
+      "id": "manager-template-opencode",
       "type": "agent-template",
       "paths": [
-        "agents/manager/manager.template.md"
+        "opencode/manager.template.md"
       ]
     },
     {
-      "id": "sdd-templates",
+      "id": "manager-template-codex",
       "type": "agent-template",
       "paths": [
-        "agents/sdd"
+        "codex/manager.template.md"
       ]
     },
     {
-      "id": "engram-template",
-      "type": "plugin-template",
+      "id": "sdd-pipeline-contract",
+      "type": "contract",
       "paths": [
-        "plugins/engram.template.ts"
+        "contracts/sdd-pipeline.md"
       ]
     },
     {
-      "id": "memory-governance",
-      "type": "docs",
+      "id": "manager-contract",
+      "type": "contract",
       "paths": [
-        "docs/memory-governance.md"
+        "contracts/manager.md"
+      ]
+    },
+    {
+      "id": "memory-governance-contract",
+      "type": "contract",
+      "paths": [
+        "contracts/memory-governance.md"
       ]
     },
     {
@@ -193,8 +200,9 @@
       "id": "codex-memory-governance",
       "type": "docs",
       "paths": [
-        "docs/codex-runtime.md",
-        "docs/memory-governance.md"
+        "docs/codex/getting-started.md",
+        "docs/codex/overlay-install.md",
+        "docs/codex/troubleshooting.md"
       ]
     }
   ]

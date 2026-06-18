@@ -61,7 +61,7 @@ test("lintMemoryPath accepts clean memory notes", async () => {
   await writeMemory(
     root,
     "clean.md",
-    "type: decision\ntopic_key: architecture/codex\nevidence: docs/codex-runtime.md\ncontent: Manager is primary\n"
+    "type: decision\ntopic_key: architecture/codex\nevidence: docs/codex/getting-started.md\ncontent: Manager is primary\n"
   );
 
   const result = await lintMemoryPath(root);

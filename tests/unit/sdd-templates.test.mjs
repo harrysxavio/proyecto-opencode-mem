@@ -4,17 +4,14 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { repoRoot } from "../../scripts/manifest-utils.mjs";
 
-const names = ["init", "explore", "propose", "spec", "design", "tasks", "apply", "verify", "archive", "onboard"];
-
-test("SDD templates exist and contain SUBAGENT_RESULT", async () => {
-  for (const name of names) {
-    const file = path.join(repoRoot, "agents", "sdd", `sdd-${name}.template.md`);
-    const text = await readFile(file, "utf8");
-    assert.match(text, /SUBAGENT_RESULT/);
-  }
-});
-
-test("sdd-init template contains SDD_INIT_PACKET", async () => {
-  const text = await readFile(path.join(repoRoot, "agents", "sdd", "sdd-init.template.md"), "utf8");
-  assert.match(text, /SDD_INIT_PACKET/);
+test("SDD pipeline contract defines all 8 phases", async () => {
+  const text = await readFile(path.join(repoRoot, "contracts", "sdd-pipeline.md"), "utf8");
+  assert.match(text, /Explore|Exploración/i);
+  assert.match(text, /Proposal|Propuesta/i);
+  assert.match(text, /Spec|Especificación/i);
+  assert.match(text, /Design|Diseño/i);
+  assert.match(text, /Tasks|Tareas/i);
+  assert.match(text, /Apply|Aplicación/i);
+  assert.match(text, /Verify|Verificación/i);
+  assert.match(text, /Archive|Archivo/i);
 });

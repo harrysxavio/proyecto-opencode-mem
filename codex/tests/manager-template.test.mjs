@@ -5,7 +5,8 @@ import path from "node:path";
 import { repoRoot } from "../../scripts/manifest-utils.mjs";
 
 const templatePath = path.join(repoRoot, "codex/manager.template.md");
-const guidePath = path.join(repoRoot, "docs/codex-runtime.md");
+const gettingStartedPath = path.join(repoRoot, "docs/codex/getting-started.md");
+const troubleshootingPath = path.join(repoRoot, "docs/codex/troubleshooting.md");
 
 async function readProjectFile(filePath) {
   return readFile(filePath, "utf8");
@@ -21,18 +22,17 @@ test("Codex Manager overlay template defines the required runtime contract", asy
   assert.match(text, /Do not modify update-managed application directories/i);
 });
 
-test("Codex runtime guide explains install safety, rollback and beginner workflow", async () => {
-  const text = await readProjectFile(guidePath);
-  assert.match(text, /Codex Runtime Orchestrator/i);
-  assert.match(text, /user-owned overlay/i);
+test("Codex install docs explain install, backup and rollback", async () => {
+  const text = await readProjectFile(gettingStartedPath);
+  assert.match(text, /Instalar el overlay|Dry-run/i);
   assert.match(text, /backup/i);
-  assert.match(text, /rollback/i);
-  assert.match(text, /beginner workflow/i);
-  assert.match(text, /OpenCode/i);
+  assert.match(text, /Rollback/i);
+  assert.match(text, /5 pasos|Getting Started/i);
+  assert.match(text, /Codex|OpenCode/i);
 });
 
-test("Codex template and guide stay portable", async () => {
-  const texts = [await readProjectFile(templatePath), await readProjectFile(guidePath)];
+test("Codex templates and docs stay portable", async () => {
+  const texts = [await readProjectFile(templatePath), await readProjectFile(gettingStartedPath), await readProjectFile(troubleshootingPath)];
   const forbiddenPatterns = [
     /[A-Z]:\\/,
     /AppData\\Local\\Programs\\OpenCode/i,

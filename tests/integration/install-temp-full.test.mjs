@@ -13,6 +13,6 @@ test("install-temp installs full profile into tests tmp only", () => {
   assert.equal(result.status, 0, result.stderr);
   const target = path.join(repoRoot, "tests", "tmp", "install-temp");
   assert.ok(existsSync(path.join(target, "templates", "opencode.example.jsonc")));
-  assert.ok(existsSync(path.join(target, "agents", "sdd", "sdd-init.template.md")));
+  assert.ok(existsSync(path.join(target, "contracts", "sdd-pipeline.md")));
   assert.ok(!result.stdout.includes(".config/opencode"));
 });

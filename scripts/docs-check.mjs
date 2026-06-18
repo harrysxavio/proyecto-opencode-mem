@@ -21,44 +21,33 @@ const repoRoot = path.resolve(__dirname, "..");
 
 const REQUIRED_DOCS = [
   "docs/getting-started.md",
-  "docs/profiles.md",
   "docs/installation-targets.md",
   "docs/safety-and-sanitization.md",
-  "docs/phase-roadmap.md",
   "docs/decisions/0002-phase-documentation-standard.md",
+  "ARCHITECTURE.md",
+  "QUICKSTART_OPENCODE.md",
+  "QUICKSTART_CODEX.md",
 ];
 
 const REQUIRED_README_SECTIONS = [
-  "Arquitectura Codex",
   "personas no t?cnicas",
   "Flujo completo",
   "memoria",
   "Noise Gate",
   "Tokens",
-  "Memoria entre sesiones",
-  "Flujo explosivo",
-  "Vista t?cnica",
-  "Auditor?a OpenCode",
-  "Puntos de mejora",
-  "C?mo usarlo",
+  "Ponytail",
   "Estado actual",
   "Rollback",
   "C?mo validar",
 ];
 
 const REQUIRED_README_HEADINGS_PATTERNS = [
-  /^# Arquitectura Codex/im,
   /^##+\s+.*personas no t.cnicas/im,
   /^##+\s+.*Flujo completo/im,
   /^##+\s+.*memoria/im,
   /^##+\s+.*Noise Gate/im,
   /^##+\s+.*Tokens/im,
-  /^##+\s+.*Memoria entre sesiones/im,
-  /^##+\s+.*Flujo explosivo/im,
-  /^##+\s+.*Vista t.cnica/im,
-  /^##+\s+.*Auditor.a OpenCode/im,
-  /^##+\s+.*Puntos de mejora/im,
-  /^##+\s+.*C.mo usarlo/im,
+  /^##+\s+.*Ponytail/im,
   /^##+\s+.*Estado actual/im,
   /^##+\s+.*Rollback/im,
   /^##+\s+.*C.mo validar/im,
@@ -102,11 +91,11 @@ const FORBIDDEN_PATTERNS = [
 
 const NEW_DOCS = [
   "docs/getting-started.md",
-  "docs/profiles.md",
   "docs/installation-targets.md",
   "docs/safety-and-sanitization.md",
-  "docs/phase-roadmap.md",
-  "docs/PHASE-1-DOCUMENTATION-AUDIT.md",
+  "docs/codex/getting-started.md",
+  "docs/codex/overlay-install.md",
+  "docs/codex/troubleshooting.md",
 ];
 
 /** Files to scan for forbidden patterns (README + all new docs marked for checks). */

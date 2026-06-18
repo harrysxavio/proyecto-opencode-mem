@@ -29,8 +29,8 @@ test("manifest declares Codex-first runtime profiles", async () => {
       "templates-core",
       "codex-manager-template",
       "codex-skills",
-      "sdd-templates",
-      "memory-governance",
+      "sdd-pipeline-contract",
+      "memory-governance-contract",
       "validation-harness"
     ]
   );
