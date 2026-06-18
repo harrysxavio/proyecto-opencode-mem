@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-18
 
-**Status:** Comparative revision pending approval
+**Status:** Approved design
 
 **Platform:** Windows with PowerShell
 **Target runtime:** OpenCode
