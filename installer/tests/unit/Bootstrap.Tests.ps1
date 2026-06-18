@@ -30,7 +30,8 @@ param(
     [string]$Project,
     [switch]$Resume,
     [switch]$NonInteractive,
-    [switch]$Json
+    [switch]$Json,
+    [switch]$ConfirmInstall
 )
 [pscustomobject]@{
     HandlerPath = $PSCommandPath
@@ -38,11 +39,12 @@ param(
     Resume = [bool]$Resume
     NonInteractive = [bool]$NonInteractive
     Json = [bool]$Json
+    ConfirmInstall = [bool]$ConfirmInstall
 }
 '@ | Set-Content -LiteralPath $handlerPath
 
         try {
-            $result = & $bootstrapPath -Project 'project path with spaces' -Resume -NonInteractive -Json
+            $result = & $bootstrapPath -Project 'project path with spaces' -Resume -NonInteractive -Json -ConfirmInstall
         }
         finally {
             Remove-Item -LiteralPath $handlerPath -Force -ErrorAction SilentlyContinue
@@ -54,5 +56,6 @@ param(
         $result.Resume | Should -BeTrue
         $result.NonInteractive | Should -BeTrue
         $result.Json | Should -BeTrue
+        $result.ConfirmInstall | Should -BeTrue
     }
 }
