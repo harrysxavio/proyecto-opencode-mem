@@ -18,27 +18,32 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 
 ## Tasks
 
-| Task | Status | Nota |
+| Task | Título | Status |
 |---|---|---|
-| Task 1 | `completed` | — |
-| Task 2 | `pending` | Next: safe process runner/router |
-| Task 3 | `pending` | — |
-| Task 4 | `pending` | — |
-| Task 5 | `pending` | — |
-| Task 6 | `pending` | — |
-| Task 7 | `pending` | — |
-| Task 8 | `pending` | — |
-| Task 9 | `pending` | — |
-| Task 10 | `pending` | — |
-| Task 11 | `pending` | — |
-| Task 12 | `pending` | — |
-| Task 13 | `pending` | — |
-| Task 14 | `pending` | — |
-| Task 15 | `pending` | — |
+| Task 1 | [Establish the PowerShell test harness and lock contract](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-1-establish-the-powershell-test-harness-and-lock-contract) | `completed` |
+| Task 2 | [Build the safe process runner and public command router](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-2-build-the-safe-process-runner-and-public-command-router) | `pending` |
+| Task 3 | [Implement Windows preflight and confirmed prerequisite installation](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-3-implement-windows-preflight-and-confirmed-prerequisite-installation) | `pending` |
+| Task 4 | [Add receipts, backups, checkpoints, resume and safe rollback](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-4-add-receipts-backups-checkpoints-resume-and-safe-rollback) | `pending` |
+| Task 5 | [Compose OpenCode JSON/JSONC without overwriting user entries](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-5-compose-opencode-jsonjsonc-without-overwriting-user-entries) | `pending` |
+| Task 6 | [Implement dependency execution and the verification registry](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-6-implement-dependency-execution-and-the-verification-registry) | `pending` |
+| Task 7 | [Install the pinned OpenCode, Engram and Graphify core](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-7-install-the-pinned-opencode-engram-and-graphify-core) | `pending` |
+| Task 8 | [Configure and probe credential-free MCP servers](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-8-configure-and-probe-credential-free-mcp-servers) | `pending` |
+| Task 9 | [Install canonical Manager, ten SDD subagents, skills and audited plugins](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-9-install-canonical-manager-ten-sdd-subagents-skills-and-audited-plugins) | `pending` |
+| Task 10 | [Add optional authenticated integrations and secure continuation](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-10-add-optional-authenticated-integrations-and-secure-continuation) | `pending` |
+| Task 11 | [Implement doctor, status and project onboarding](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-11-implement-doctor-status-and-project-onboarding) | `pending` |
+| Task 12 | [Add source, disposable-install and tamper test suites](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-12-add-source-disposable-install-and-tamper-test-suites) | `pending` |
+| Task 13 | [Rewrite beginner-facing and architectural documentation](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-13-rewrite-beginner-facing-and-architectural-documentation) | `pending` |
+| Task 14 | [Add Windows CI and release provenance](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-14-add-windows-ci-and-release-provenance) | `pending` |
+| Task 15 | [Execute the clean Windows release gate and finalize documentation status](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-15-execute-the-clean-windows-release-gate-and-finalize-documentation-status) | `pending` |
+
+## Estado actual
+
+- Tarea activa: ninguna.
+- Siguiente tarea: [Task 2 — Build the safe process runner and public command router](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-2-build-the-safe-process-runner-and-public-command-router).
 
 ## Checkpoints
 
-### 2026-06-18
+### 2026-06-18 — Task 1
 
 - Preparación del worktree: commit `8533b43` en `master`.
 - Baseline sanitizer: commit `1e66dc7`, aprobado con `103/103`.
@@ -56,17 +61,11 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 - `OPENCODE_KIT_ROOT` define la ownership del kit.
 - No afirmar `100%` hasta completar un E2E limpio en Windows.
 
-## Siguiente paso
-
-Task 2: safe process runner/router.
-
 ## Plantilla de checkpoint
 
-### YYYY-MM-DD
+### YYYY-MM-DD — Task N
 
-- Task: `N`.
 - Status: `pending|in_progress|completed|blocked`.
 - Commits: `SHA`.
 - Tests: resultado y conteo.
 - Reviews: resultado.
-- Next: siguiente acción.
