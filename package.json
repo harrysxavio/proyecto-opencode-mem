@@ -13,6 +13,7 @@
     "test:shared": "node scripts/run-tests.mjs tests",
     "test:codex": "node scripts/run-tests.mjs codex/tests",
     "test:opencode": "node scripts/run-tests.mjs opencode/tests",
+    "test:powershell": "pwsh -NoProfile -File installer/tests/run.ps1",
     "test:all": "node scripts/validate.mjs && node scripts/sanitize-check.mjs && node scripts/docs-check.mjs && node scripts/run-tests.mjs",
     "install:dry-run": "node scripts/install.mjs --dry-run",
     "install:temp": "node scripts/install-temp.mjs",

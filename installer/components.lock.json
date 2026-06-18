@@ -1,0 +1,441 @@
+{
+  "schemaVersion": 1,
+  "kitVersion": "0.2.0-rc.1",
+  "platform": "windows-powershell",
+  "packs": {
+    "core": [
+      "git",
+      "node",
+      "pnpm",
+      "python",
+      "uv",
+      "opencode",
+      "engram",
+      "graphify",
+      "context7",
+      "playwright",
+      "runtime-assets"
+    ],
+    "authenticated": [
+      "github",
+      "supabase",
+      "notebooklm",
+      "browserbase"
+    ]
+  },
+  "components": [
+    {
+      "id": "git",
+      "version": "2.53.0",
+      "dependencies": [],
+      "source": {
+        "kind": "versioned-package",
+        "name": "Git.Git"
+      },
+      "integrityStatus": "verified-metadata",
+      "install": {
+        "allowed": true,
+        "command": "winget",
+        "arguments": [
+          "install",
+          "--id",
+          "Git.Git",
+          "--version",
+          "2.53.0",
+          "--exact"
+        ]
+      },
+      "verificationIds": [
+        "git.version"
+      ]
+    },
+    {
+      "id": "node",
+      "version": "22.17.0",
+      "dependencies": [],
+      "source": {
+        "kind": "versioned-package",
+        "name": "OpenJS.NodeJS.LTS"
+      },
+      "integrityStatus": "verified-metadata",
+      "install": {
+        "allowed": true,
+        "command": "winget",
+        "arguments": [
+          "install",
+          "--id",
+          "OpenJS.NodeJS.LTS",
+          "--version",
+          "22.17.0",
+          "--exact"
+        ]
+      },
+      "verificationIds": [
+        "node.version"
+      ]
+    },
+    {
+      "id": "pnpm",
+      "version": "11.8.0",
+      "dependencies": [
+        "node"
+      ],
+      "source": {
+        "kind": "versioned-package",
+        "name": "pnpm"
+      },
+      "integrityStatus": "verified-metadata",
+      "install": {
+        "allowed": true,
+        "command": "npm",
+        "arguments": [
+          "install",
+          "--global",
+          "pnpm@11.8.0"
+        ]
+      },
+      "verificationIds": [
+        "pnpm.version"
+      ]
+    },
+    {
+      "id": "python",
+      "version": "3.13.5",
+      "dependencies": [],
+      "source": {
+        "kind": "versioned-package",
+        "name": "Python.Python.3.13"
+      },
+      "integrityStatus": "verified-metadata",
+      "install": {
+        "allowed": true,
+        "command": "winget",
+        "arguments": [
+          "install",
+          "--id",
+          "Python.Python.3.13",
+          "--version",
+          "3.13.5",
+          "--exact"
+        ]
+      },
+      "verificationIds": [
+        "python.version"
+      ]
+    },
+    {
+      "id": "uv",
+      "version": "0.11.14",
+      "dependencies": [],
+      "source": {
+        "kind": "versioned-package",
+        "name": "astral-sh.uv"
+      },
+      "integrityStatus": "verified-metadata",
+      "install": {
+        "allowed": true,
+        "command": "winget",
+        "arguments": [
+          "install",
+          "--id",
+          "astral-sh.uv",
+          "--version",
+          "0.11.14",
+          "--exact"
+        ]
+      },
+      "verificationIds": [
+        "uv.version"
+      ]
+    },
+    {
+      "id": "opencode",
+      "version": "1.17.8",
+      "dependencies": [
+        "node",
+        "pnpm"
+      ],
+      "source": {
+        "kind": "versioned-package",
+        "name": "opencode-ai"
+      },
+      "integrityStatus": "verified-metadata",
+      "install": {
+        "allowed": true,
+        "command": "pnpm",
+        "arguments": [
+          "add",
+          "--global",
+          "opencode-ai@1.17.8"
+        ]
+      },
+      "verificationIds": [
+        "opencode.version"
+      ]
+    },
+    {
+      "id": "engram",
+      "version": "1.16.3",
+      "dependencies": [],
+      "source": {
+        "kind": "versioned-package",
+        "name": "engram"
+      },
+      "integrityStatus": "planning-only-unverified",
+      "install": {
+        "allowed": false,
+        "command": "engram",
+        "arguments": [
+          "install",
+          "--version",
+          "1.16.3"
+        ]
+      },
+      "verificationIds": [
+        "engram.version",
+        "engram.persist"
+      ]
+    },
+    {
+      "id": "graphify",
+      "version": "0.8.41",
+      "dependencies": [
+        "python",
+        "uv"
+      ],
+      "source": {
+        "kind": "versioned-package",
+        "name": "graphifyy"
+      },
+      "integrityStatus": "verified-metadata",
+      "install": {
+        "allowed": true,
+        "command": "uv",
+        "arguments": [
+          "tool",
+          "install",
+          "graphifyy==0.8.41"
+        ]
+      },
+      "verificationIds": [
+        "graphify.version",
+        "graphify.query"
+      ]
+    },
+    {
+      "id": "context7",
+      "version": "3.2.1",
+      "dependencies": [
+        "node",
+        "pnpm"
+      ],
+      "source": {
+        "kind": "versioned-package",
+        "name": "@upstash/context7-mcp"
+      },
+      "integrityStatus": "verified-metadata",
+      "install": {
+        "allowed": true,
+        "command": "pnpm",
+        "arguments": [
+          "add",
+          "--global",
+          "@upstash/context7-mcp@3.2.1"
+        ]
+      },
+      "verificationIds": [
+        "context7.version",
+        "mcp.context7"
+      ]
+    },
+    {
+      "id": "playwright",
+      "version": "0.0.76",
+      "dependencies": [
+        "node",
+        "pnpm"
+      ],
+      "source": {
+        "kind": "versioned-package",
+        "name": "@playwright/mcp"
+      },
+      "integrityStatus": "verified-metadata",
+      "install": {
+        "allowed": true,
+        "command": "pnpm",
+        "arguments": [
+          "add",
+          "--global",
+          "@playwright/mcp@0.0.76"
+        ]
+      },
+      "verificationIds": [
+        "playwright.version",
+        "mcp.playwright"
+      ]
+    },
+    {
+      "id": "runtime-assets",
+      "version": "0.2.0-rc.1",
+      "dependencies": [],
+      "source": {
+        "kind": "bundled-assets",
+        "name": "installer/assets"
+      },
+      "integrityStatus": "verified-metadata",
+      "install": {
+        "allowed": true,
+        "command": "Copy-Item",
+        "arguments": [
+          "-LiteralPath",
+          "installer/assets",
+          "-Destination",
+          "${CODEX_OVERLAY_ROOT}",
+          "-Recurse"
+        ]
+      },
+      "verificationIds": [
+        "runtime-assets.layout"
+      ]
+    },
+    {
+      "id": "github",
+      "version": "0.2.0-rc.1",
+      "dependencies": [
+        "runtime-assets"
+      ],
+      "source": {
+        "kind": "bundled-config",
+        "name": "authenticated/github"
+      },
+      "integrityStatus": "repository-owned",
+      "install": {
+        "allowed": true,
+        "command": "Copy-Item",
+        "arguments": [
+          "-LiteralPath",
+          "installer/config/github.json",
+          "-Destination",
+          "${OPENCODE_CONFIG_ROOT}"
+        ]
+      },
+      "verificationIds": [
+        "config.github"
+      ],
+      "config": {
+        "command": "gh",
+        "arguments": [
+          "auth",
+          "status"
+        ],
+        "environment": [
+          "GITHUB_TOKEN"
+        ]
+      }
+    },
+    {
+      "id": "supabase",
+      "version": "0.2.0-rc.1",
+      "dependencies": [
+        "runtime-assets"
+      ],
+      "source": {
+        "kind": "bundled-config",
+        "name": "authenticated/supabase"
+      },
+      "integrityStatus": "repository-owned",
+      "install": {
+        "allowed": true,
+        "command": "Copy-Item",
+        "arguments": [
+          "-LiteralPath",
+          "installer/config/supabase.json",
+          "-Destination",
+          "${OPENCODE_CONFIG_ROOT}"
+        ]
+      },
+      "verificationIds": [
+        "config.supabase"
+      ],
+      "config": {
+        "command": "supabase",
+        "arguments": [
+          "status"
+        ],
+        "environment": [
+          "SUPABASE_ACCESS_TOKEN"
+        ]
+      }
+    },
+    {
+      "id": "notebooklm",
+      "version": "0.2.0-rc.1",
+      "dependencies": [
+        "runtime-assets"
+      ],
+      "source": {
+        "kind": "bundled-config",
+        "name": "authenticated/notebooklm"
+      },
+      "integrityStatus": "repository-owned",
+      "install": {
+        "allowed": true,
+        "command": "Copy-Item",
+        "arguments": [
+          "-LiteralPath",
+          "installer/config/notebooklm.json",
+          "-Destination",
+          "${OPENCODE_CONFIG_ROOT}"
+        ]
+      },
+      "verificationIds": [
+        "config.notebooklm"
+      ],
+      "config": {
+        "command": "notebooklm",
+        "arguments": [
+          "auth",
+          "status"
+        ],
+        "environment": [
+          "NOTEBOOKLM_AUTH_JSON"
+        ]
+      }
+    },
+    {
+      "id": "browserbase",
+      "version": "0.2.0-rc.1",
+      "dependencies": [
+        "runtime-assets"
+      ],
+      "source": {
+        "kind": "bundled-config",
+        "name": "authenticated/browserbase"
+      },
+      "integrityStatus": "repository-owned",
+      "install": {
+        "allowed": true,
+        "command": "Copy-Item",
+        "arguments": [
+          "-LiteralPath",
+          "installer/config/browserbase.json",
+          "-Destination",
+          "${OPENCODE_CONFIG_ROOT}"
+        ]
+      },
+      "verificationIds": [
+        "config.browserbase"
+      ],
+      "config": {
+        "command": "browserbase",
+        "arguments": [
+          "status"
+        ],
+        "environment": [
+          "BROWSERBASE_API_KEY",
+          "BROWSERBASE_PROJECT_ID"
+        ]
+      }
+    }
+  ]
+}
