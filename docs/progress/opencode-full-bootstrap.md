@@ -71,20 +71,22 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 ### 2026-06-18 — Task 3
 
 - Status: `completed`.
-- Commits: inicio `a8d5e9b`; implementación `40cd384`; quality fix `3fde3c3`.
+- Commits: inicio `a8d5e9b`; implementación `40cd384`; quality fixes `3fde3c3`, `c36f5a3`.
 - Tests:
   - TDD RED focalizado: `2/13` passed, `11/13` failed por funcionalidad aún ausente.
   - TDD GREEN focalizado: `14/14`.
   - Quality fix RED focalizado: `11/16` passed, `5/16` failed por remediaciones aún ausentes.
   - Quality fix GREEN focalizado: `16/16`.
-  - `pnpm test:powershell`: `56/56`.
+  - Prerelease RED focalizado: `16/17` passed, `1/17` failed por pérdida del sufijo semver.
+  - Prerelease GREEN focalizado: `17/17`.
+  - `pnpm test:powershell`: `57/57`.
   - `pnpm test:all`: `109/109`.
   - `pnpm docs:check`: `PASS`.
   - `git diff --check`: `PASS`.
 - Reviews:
   - Self-review: `APPROVED`.
   - Spec: `PENDING`.
-  - Quality: `PENDING` (hallazgos corregidos; re-review pendiente).
+  - Quality: `PENDING` (último hallazgo corregido; re-review pendiente).
 
 ## Decisiones
 
