@@ -15,7 +15,13 @@ function ConvertFrom-VersionProbeResult {
         return [pscustomobject]@{ Present = $true; Usable = $false; Version = $null; Id = $Id }
     }
     $text = "$($Result.StdOut) $($Result.StdErr)"
-    $match = [regex]::Match($text, '(?<!\d)(\d+\.\d+\.\d+)(?:-[0-9A-Za-z.-]+)?')
+    if ($Id -eq 'git') {
+        $gitForWindows = [regex]::Match($text, '(?i)git version (\d+\.\d+\.\d+)\.windows\.\d+(?![0-9A-Za-z.+-])')
+        if ($gitForWindows.Success) {
+            return [pscustomobject]@{ Present = $true; Usable = $true; Version = $gitForWindows.Groups[1].Value; Id = $Id }
+        }
+    }
+    $match = [regex]::Match($text, '(?<!\d)(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)(?![0-9A-Za-z.+-])')
     if (-not $match.Success) {
         return [pscustomobject]@{ Present = $true; Usable = $false; Version = $null; Id = $Id }
     }

@@ -41,6 +41,7 @@ Describe 'Get-BootstrapPreflight' {
 Describe 'ConvertFrom-VersionProbeResult' {
     It 'parses successful semantic versions including common command aliases' {
         (ConvertFrom-VersionProbeResult -Id node -Result ([pscustomobject]@{ ExitCode = 0; StdOut = 'v22.17.0'; StdErr = '' })).Version | Should -Be '22.17.0'
+        (ConvertFrom-VersionProbeResult -Id node -Result ([pscustomobject]@{ ExitCode = 0; StdOut = 'v22.17.0-rc.1'; StdErr = '' })).Version | Should -Be '22.17.0-rc.1'
         (ConvertFrom-VersionProbeResult -Id python -Result ([pscustomobject]@{ ExitCode = 0; StdOut = ''; StdErr = 'Python 3.13.5' })).Version | Should -Be '3.13.5'
         (ConvertFrom-VersionProbeResult -Id git -Result ([pscustomobject]@{ ExitCode = 0; StdOut = 'git version 2.53.0.windows.1'; StdErr = '' })).Version | Should -Be '2.53.0'
     }
@@ -82,6 +83,18 @@ Describe 'Resolve-PrerequisitePlan' {
         $plan.VersionMismatches[0].InstalledVersion | Should -Be '2.52.0'
         $plan.VersionMismatches[0].RequiredVersion | Should -Be '2.53.0'
         ($plan | ConvertTo-Json -Depth 10) | Should -Not -Match '(?i)latest'
+    }
+
+    It 'compares prerelease versions exactly against the lock' {
+        $resolver = { param($id) [pscustomobject]@{ Present = $true; Usable = $true; Version = if ($id -eq 'node') { '22.17.0-rc.1' } else { ($lock.components | Where-Object id -EQ $id).version } } }
+        $stablePlan = Resolve-PrerequisitePlan -Lock $lock -CommandResolver $resolver
+        $stablePlan.VersionMismatches.Id | Should -Contain 'node'
+
+        $prereleaseLock = $lock | ConvertTo-Json -Depth 30 | ConvertFrom-Json -Depth 30
+        ($prereleaseLock.components | Where-Object id -EQ 'node').version = '22.17.0-rc.1'
+        $prereleasePlan = Resolve-PrerequisitePlan -Lock $prereleaseLock -CommandResolver $resolver
+        $prereleasePlan.VersionMismatches.Id | Should -Not -Contain 'node'
+        $prereleasePlan.CompatibleIds | Should -Contain 'node'
     }
 }
 
