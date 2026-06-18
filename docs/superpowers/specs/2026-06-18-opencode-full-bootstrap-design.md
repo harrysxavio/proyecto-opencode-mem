@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-18
 
-**Status:** Approved design
+**Status:** Comparative revision pending approval
 
 **Platform:** Windows with PowerShell
 **Target runtime:** OpenCode
@@ -49,6 +49,27 @@ bootstrap.ps1
   -> installation receipt
 ```
 
+The public interface is one beginner-facing command with explicit verbs:
+
+```powershell
+.\installer\bootstrap.ps1 install
+.\installer\bootstrap.ps1 doctor
+.\installer\bootstrap.ps1 status
+.\installer\bootstrap.ps1 configure
+.\installer\bootstrap.ps1 onboard -Project C:\path\to\project
+.\installer\bootstrap.ps1 rollback
+```
+
+The specialized scripts remain internal module boundaries or compatibility shims. Documentation does not require a beginner to discover which script performs each lifecycle action.
+
+The architecture has three planes:
+
+1. **Canonical capability plane:** shared contracts, skills and role definitions exist once.
+2. **Runtime adapter plane:** thin OpenCode bindings point to canonical capabilities and contain only runtime-specific metadata.
+3. **State plane:** installation receipts are separate from project-work persistence.
+
+Runtime adapters must not duplicate full role or skill procedures. The doctor validates every adapter target.
+
 ### 5.1 Proposed files
 
 | File | Responsibility |
@@ -67,6 +88,19 @@ bootstrap.ps1
 
 Each module owns one concern and communicates through structured objects rather than parsing console output.
 
+### 5.2 Component packs
+
+`components.lock.json` groups components into declarative capability packs:
+
+- `core`: every credential-free component required for readiness;
+- `authenticated`: optional integrations selected during the interactive flow.
+
+Each component declares its source, exact version, dependencies, owned targets and one or more `verificationId` values. A public guarantee without an executable `verificationId` is invalid and must be described as policy rather than verified behavior.
+
+Future packs may be added without changing the component runner. The first release still installs the complete mandatory core; packs do not make required components optional.
+
+Commands are stored as executable plus argument arrays. The lock never contains arbitrary shell command strings and the runner never uses `Invoke-Expression` or an equivalent `eval` mechanism.
+
 ## 6. Installation phases
 
 1. Detect Windows, PowerShell and current configuration.
@@ -79,6 +113,7 @@ Each module owns one concern and communicates through structured objects rather 
 8. Offer optional authenticated integrations individually.
 9. Run the integral doctor.
 10. Write a receipt containing component states and owned paths.
+11. Print the installed locations, readiness state, pending integrations and exact next command.
 
 Every component follows:
 
@@ -87,6 +122,8 @@ DETECTED -> PLANNED -> INSTALLED -> CONFIGURED -> VERIFIED
 ```
 
 An interrupted run can continue with `bootstrap.ps1 -Resume`. The receipt records the last completed state for each component.
+
+The receipt also records release provenance: kit version, source commit, lock digest and artifact hashes. This makes an installation reproducible and auditable after the repository evolves.
 
 ## 7. Mandatory core
 
@@ -121,6 +158,8 @@ The exact count is generated from the locked manifest rather than duplicated in 
 
 The Manager is the only primary agent. Every SDD worker is configured as `mode: subagent`, hidden from primary selection and unable to become an orchestrator.
 
+Canonical procedures are stored once. OpenCode agent and skill adapters are thin bindings generated or validated from the locked catalog. An adapter that embeds a second divergent copy of a canonical procedure fails validation.
+
 ## 9. Plugins
 
 The bootstrap does not copy private plugins from the development computer. It installs only small, audited, repository-owned adapters compatible with the pinned OpenCode and dependency versions.
@@ -151,6 +190,16 @@ Secrets are never written to Git, logs, backups, receipts or generated Markdown.
 The composer detects active OpenCode JSON/JSONC configuration, creates an exact backup and previews a structural diff. It adds only kit-owned MCP, agent, plugin and instruction entries.
 
 The receipt records each owned key and filesystem path. Existing user entries that do not belong to the kit are preserved. Name collisions are reported before writing and require an explicit resolution; they are never silently overwritten.
+
+### 11.1 State ownership
+
+Installation state and agent work state are distinct:
+
+- sanitized receipts and checkpoints describe what the installer changed;
+- Engram is the semantic memory source of truth for agent work;
+- a minimal repository-owned work checkpoint may record current phase, last completed task and next action so an interrupted session remains resumable during temporary MCP unavailability.
+
+The file checkpoint never stores raw prompts, source code, secrets, full logs or a copy of the Engram database. After Engram recovers, memory retrieval remains governed by the canonical memory policy.
 
 ## 12. Security controls
 
@@ -187,6 +236,8 @@ Automatic uninstall of shared prerequisites is excluded because other applicatio
 - Integration tests using disposable targets and fake component executables.
 - Negative tests for bad checksums, malformed JSONC, collisions, missing tools, interrupted phases and tampered receipts.
 - Existing Node test suite remains green.
+- Contract tests prove that every documented guarantee maps to a valid `verificationId`.
+- Adapter tests prove that every OpenCode binding resolves to one canonical capability.
 
 ### 14.2 Windows end-to-end matrix
 
@@ -201,6 +252,14 @@ Automatic uninstall of shared prerequisites is excluded because other applicatio
 - Full rollback proving exact restoration.
 - OpenCode restart proving Engram persistence and component discovery.
 
+### 14.3 Independent verification modes
+
+- **Source doctor:** validates the cloned repository before installation.
+- **Disposable installed doctor:** validates an isolated target produced by the installer.
+- **Clean-machine E2E:** validates the complete journey on Windows Sandbox or a clean VM.
+
+All three modes must be green. Source validation must not assume that target-only paths already exist, and installed validation must not silently fall back to source files.
+
 ## 15. Release gate
 
 The project may describe the Windows bootstrap as fully functional only when a clean-machine run proves all of the following:
@@ -214,10 +273,49 @@ The project may describe the Windows bootstrap as fully functional only when a c
 7. A second run is idempotent.
 8. Rollback restores the original configuration.
 9. CI and the Windows end-to-end workflow pass from a clean clone.
+10. Source doctor and disposable installed doctor pass independently.
+11. Every advertised capability has an executable verification result.
 
 Until that gate passes, documentation must use `experimental` or `release candidate`, not `100% functional`.
 
-## 16. Explicit exclusions
+## 16. Capability reporting and onboarding
+
+`bootstrap.ps1 status` and the final installation summary report each capability as exactly one of:
+
+- `INSTALLED_VERIFIED`;
+- `INSTALLED_DEGRADED`;
+- `PENDING_AUTH`;
+- `NOT_INSTALLED`;
+- `UNSUPPORTED`.
+
+The result is generated from doctor evidence, never inferred only from the presence of a file.
+
+After a ready result, the installer offers but does not force:
+
+```powershell
+.\installer\bootstrap.ps1 onboard -Project C:\path\to\project
+```
+
+Onboarding uses Graphify plus the `onboard` subagent to build a compact project index and initial operating context. It does not edit application code, does not block global installation, and is safe to skip.
+
+## 17. Documentation contract
+
+README and QuickStart use this fixed beginner-first order:
+
+1. what the kit is;
+2. what it installs and does not install;
+3. one recommended path for a clean Windows computer;
+4. preview, confirmation and install;
+5. example final result and pending-auth states;
+6. map of installed files and user-owned locations;
+7. first-use proof for memory, graph, skills and subagents;
+8. doctor, configure, status and rollback;
+9. capability matrix and limitations;
+10. advanced architecture links.
+
+The documentation explicitly distinguishes “file installed”, “process connected” and “behavior functionally verified”.
+
+## 18. Explicit exclusions
 
 - macOS and Linux support.
 - Automatic future updates.
@@ -225,3 +323,7 @@ Until that gate passes, documentation must use `experimental` or `release candid
 - Installing every MCP or plugin in the OpenCode ecosystem.
 - Copying private plugins from the current workstation.
 - Automatically uninstalling shared prerequisites during rollback.
+
+## 19. Comparative design basis
+
+The comparative audit against `sergioahumada/harness` is recorded in `docs/audits/2026-06-18-harness-comparison.md`. The design adopts its canonical-role, resumable-state, single-verifier and flavor-extension concepts while rejecting remote script piping, unowned overwrites, shell `eval`, Windows-incompatible symlinks and guarantees that are declared but not enforced.
