@@ -29,10 +29,10 @@
       "version": "2.53.0",
       "dependencies": [],
       "source": {
-        "kind": "versioned-package",
-        "name": "Git.Git"
+        "kind": "winget",
+        "id": "Git.Git"
       },
-      "integrityStatus": "verified-metadata",
+      "integrityStatus": "verified",
       "install": {
         "allowed": true,
         "command": "winget",
@@ -58,10 +58,10 @@
       "version": "22.17.0",
       "dependencies": [],
       "source": {
-        "kind": "versioned-package",
-        "name": "OpenJS.NodeJS.LTS"
+        "kind": "winget",
+        "id": "OpenJS.NodeJS.LTS"
       },
-      "integrityStatus": "verified-metadata",
+      "integrityStatus": "verified",
       "install": {
         "allowed": true,
         "command": "winget",
@@ -90,10 +90,10 @@
         "node"
       ],
       "source": {
-        "kind": "versioned-package",
-        "name": "pnpm"
+        "kind": "npm",
+        "package": "pnpm"
       },
-      "integrityStatus": "verified-metadata",
+      "integrityStatus": "verified",
       "install": {
         "allowed": true,
         "command": "npm",
@@ -116,10 +116,10 @@
       "version": "3.13.5",
       "dependencies": [],
       "source": {
-        "kind": "versioned-package",
-        "name": "Python.Python.3.13"
+        "kind": "winget",
+        "id": "Python.Python.3.13"
       },
-      "integrityStatus": "verified-metadata",
+      "integrityStatus": "verified",
       "install": {
         "allowed": true,
         "command": "winget",
@@ -145,10 +145,10 @@
       "version": "0.11.14",
       "dependencies": [],
       "source": {
-        "kind": "versioned-package",
-        "name": "astral-sh.uv"
+        "kind": "winget",
+        "id": "astral-sh.uv"
       },
-      "integrityStatus": "verified-metadata",
+      "integrityStatus": "verified",
       "install": {
         "allowed": true,
         "command": "winget",
@@ -177,10 +177,10 @@
         "pnpm"
       ],
       "source": {
-        "kind": "versioned-package",
-        "name": "opencode-ai"
+        "kind": "npm",
+        "package": "opencode-ai"
       },
-      "integrityStatus": "verified-metadata",
+      "integrityStatus": "verified",
       "install": {
         "allowed": true,
         "command": "pnpm",
@@ -203,8 +203,7 @@
       "version": "1.16.3",
       "dependencies": [],
       "source": {
-        "kind": "versioned-package",
-        "name": "engram"
+        "kind": "github-release"
       },
       "integrityStatus": "planning-only-unverified",
       "install": {
@@ -233,10 +232,10 @@
         "uv"
       ],
       "source": {
-        "kind": "versioned-package",
-        "name": "graphifyy"
+        "kind": "python-package",
+        "package": "graphifyy"
       },
-      "integrityStatus": "verified-metadata",
+      "integrityStatus": "verified",
       "install": {
         "allowed": true,
         "command": "uv",
@@ -263,10 +262,10 @@
         "pnpm"
       ],
       "source": {
-        "kind": "versioned-package",
-        "name": "@upstash/context7-mcp"
+        "kind": "npm",
+        "package": "@upstash/context7-mcp"
       },
-      "integrityStatus": "verified-metadata",
+      "integrityStatus": "verified",
       "install": {
         "allowed": true,
         "command": "pnpm",
@@ -293,10 +292,10 @@
         "pnpm"
       ],
       "source": {
-        "kind": "versioned-package",
-        "name": "@playwright/mcp"
+        "kind": "npm",
+        "package": "@playwright/mcp"
       },
-      "integrityStatus": "verified-metadata",
+      "integrityStatus": "verified",
       "install": {
         "allowed": true,
         "command": "pnpm",
@@ -320,10 +319,10 @@
       "version": "0.2.0-rc.1",
       "dependencies": [],
       "source": {
-        "kind": "bundled-assets",
-        "name": "installer/assets"
+        "kind": "repository-assets",
+        "sourcePath": "installer/assets"
       },
-      "integrityStatus": "verified-metadata",
+      "integrityStatus": "not-applicable",
       "install": {
         "allowed": true,
         "command": "Copy-Item",
@@ -331,7 +330,7 @@
           "-LiteralPath",
           "installer/assets",
           "-Destination",
-          "${CODEX_OVERLAY_ROOT}",
+          "${OPENCODE_KIT_ROOT}",
           "-Recurse"
         ]
       },
@@ -350,10 +349,10 @@
         "runtime-assets"
       ],
       "source": {
-        "kind": "bundled-config",
-        "name": "authenticated/github"
+        "kind": "repository-assets",
+        "sourcePath": "installer/config/github.json"
       },
-      "integrityStatus": "repository-owned",
+      "integrityStatus": "not-applicable",
       "install": {
         "allowed": true,
         "command": "Copy-Item",
@@ -389,10 +388,10 @@
         "runtime-assets"
       ],
       "source": {
-        "kind": "bundled-config",
-        "name": "authenticated/supabase"
+        "kind": "repository-assets",
+        "sourcePath": "installer/config/supabase.json"
       },
-      "integrityStatus": "repository-owned",
+      "integrityStatus": "not-applicable",
       "install": {
         "allowed": true,
         "command": "Copy-Item",
@@ -427,10 +426,10 @@
         "runtime-assets"
       ],
       "source": {
-        "kind": "bundled-config",
-        "name": "authenticated/notebooklm"
+        "kind": "repository-assets",
+        "sourcePath": "installer/config/notebooklm.json"
       },
-      "integrityStatus": "repository-owned",
+      "integrityStatus": "not-applicable",
       "install": {
         "allowed": true,
         "command": "Copy-Item",
@@ -466,10 +465,10 @@
         "runtime-assets"
       ],
       "source": {
-        "kind": "bundled-config",
-        "name": "authenticated/browserbase"
+        "kind": "repository-assets",
+        "sourcePath": "installer/config/browserbase.json"
       },
-      "integrityStatus": "repository-owned",
+      "integrityStatus": "not-applicable",
       "install": {
         "allowed": true,
         "command": "Copy-Item",

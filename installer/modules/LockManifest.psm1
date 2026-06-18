@@ -10,6 +10,15 @@ function Test-LockProperty {
     return $null -ne $Object -and $null -ne $Object.PSObject.Properties[$Name]
 }
 
+function Test-LockStringArray {
+    param([object]$Value)
+    if ($Value -isnot [array]) { return $false }
+    foreach ($item in $Value) {
+        if ($item -isnot [string]) { return $false }
+    }
+    return $true
+}
+
 function Read-ComponentLock {
     [CmdletBinding()]
     param(
@@ -66,29 +75,66 @@ function Read-ComponentLock {
         if (-not (Test-LockProperty $component 'required') -or $component.required -isnot [bool]) {
             Throw-LockError 'LOCK_COMPONENT_REQUIRED_INVALID' "Component '$($component.id)' required must be boolean."
         }
-        if (-not (Test-LockProperty $component 'ownedTargets') -or $component.ownedTargets -isnot [array]) {
+        if (-not (Test-LockProperty $component 'ownedTargets') -or -not (Test-LockStringArray $component.ownedTargets)) {
             Throw-LockError 'LOCK_COMPONENT_OWNERSHIP_INVALID' "Component '$($component.id)' ownedTargets must be an array."
+        }
+        if (-not (Test-LockProperty $component.install 'allowed') -or $component.install.allowed -isnot [bool]) {
+            Throw-LockError 'LOCK_INSTALL_ALLOWED_INVALID' "Component '$($component.id)' install.allowed must be boolean."
+        }
+        if (-not (Test-LockProperty $component 'integrityStatus') -or $component.integrityStatus -notin @('verified', 'planning-only-unverified', 'not-applicable')) {
+            Throw-LockError 'LOCK_INTEGRITY_STATUS_INVALID' "Component '$($component.id)' has an invalid integrityStatus."
+        }
+        if ($component.source.kind -notin @('winget', 'npm', 'python-package', 'github-release', 'repository-assets')) {
+            Throw-LockError 'LOCK_SOURCE_KIND_INVALID' "Component '$($component.id)' has an unsupported source kind."
         }
         if ([string]::IsNullOrWhiteSpace($component.id)) { Throw-LockError 'LOCK_COMPONENT_ID' 'Every component requires an ID.' }
         if (-not $ids.Add([string]$component.id)) { Throw-LockError 'LOCK_DUPLICATE_ID' "Duplicate component ID '$($component.id)'." }
         if ([string]::IsNullOrWhiteSpace($component.version) -or $component.version -match '(?i)latest' -or $component.version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
             Throw-LockError 'LOCK_VERSION' "Component '$($component.id)' requires an exact version."
         }
-        if ($component.dependencies -isnot [array]) { Throw-LockError 'LOCK_DEPENDENCIES' "Component '$($component.id)' dependencies must be an array." }
+        if (-not (Test-LockStringArray $component.dependencies)) { Throw-LockError 'LOCK_DEPENDENCIES_INVALID' "Component '$($component.id)' dependencies must be a string array." }
         if ([string]::IsNullOrWhiteSpace($component.install.command) -or $component.install.command -match '[;&|]') {
             Throw-LockError 'LOCK_INSTALL_COMMAND' "Component '$($component.id)' has an unsafe install command."
         }
-        if ($component.install.arguments -isnot [array]) { Throw-LockError 'LOCK_INSTALL_ARGUMENTS' "Component '$($component.id)' install arguments must be an array." }
-        if ($component.verificationIds -isnot [array] -or $component.verificationIds.Count -eq 0) {
+        if (-not (Test-LockStringArray $component.install.arguments)) { Throw-LockError 'LOCK_INSTALL_ARGUMENTS_INVALID' "Component '$($component.id)' install arguments must be a string array." }
+        if (-not (Test-LockStringArray $component.verificationIds) -or $component.verificationIds.Count -eq 0) {
             Throw-LockError 'LOCK_VERIFICATION_IDS' "Component '$($component.id)' requires verification IDs."
         }
-        if ($component.source.kind -eq 'github-release') {
-            if (-not (Test-LockProperty $component.source 'url') -or -not (Test-LockProperty $component.source 'sha256')) {
-                Throw-LockError 'LOCK_SOURCE_INTEGRITY' "Component '$($component.id)' is missing GitHub release integrity metadata."
+        switch ($component.source.kind) {
+            'winget' {
+                if ($component.integrityStatus -ne 'verified' -or -not (Test-LockProperty $component.source 'id') -or $component.source.id -isnot [string] -or [string]::IsNullOrWhiteSpace($component.source.id)) {
+                    Throw-LockError 'LOCK_SOURCE_METADATA_INVALID' "Component '$($component.id)' requires a verified winget ID."
+                }
             }
-            $versionToken = [regex]::Escape([string]$component.version)
-            if ($component.source.url -notmatch '^https://' -or $component.source.url -notmatch $versionToken -or $component.source.sha256 -notmatch '^[0-9a-f]{64}$') {
-                Throw-LockError 'LOCK_SOURCE_INTEGRITY' "Component '$($component.id)' has invalid GitHub release integrity metadata."
+            'npm' {
+                if ($component.integrityStatus -ne 'verified' -or -not (Test-LockProperty $component.source 'package') -or $component.source.package -isnot [string] -or [string]::IsNullOrWhiteSpace($component.source.package)) {
+                    Throw-LockError 'LOCK_SOURCE_METADATA_INVALID' "Component '$($component.id)' requires a verified npm package."
+                }
+            }
+            'python-package' {
+                if ($component.integrityStatus -ne 'verified' -or -not (Test-LockProperty $component.source 'package') -or $component.source.package -isnot [string] -or [string]::IsNullOrWhiteSpace($component.source.package)) {
+                    Throw-LockError 'LOCK_SOURCE_METADATA_INVALID' "Component '$($component.id)' requires a verified Python package."
+                }
+            }
+            'repository-assets' {
+                if ($component.integrityStatus -ne 'not-applicable' -or -not (Test-LockProperty $component.source 'sourcePath') -or $component.source.sourcePath -isnot [string] -or [string]::IsNullOrWhiteSpace($component.source.sourcePath)) {
+                    Throw-LockError 'LOCK_SOURCE_METADATA_INVALID' "Component '$($component.id)' requires a repository sourcePath."
+                }
+            }
+            'github-release' {
+                if ($component.integrityStatus -eq 'planning-only-unverified') {
+                    if ($component.install.allowed) { Throw-LockError 'LOCK_SOURCE_INTEGRITY' "Unverified GitHub release '$($component.id)' cannot be installed." }
+                }
+                elseif ($component.integrityStatus -eq 'verified') {
+                    if (-not (Test-LockProperty $component.source 'url') -or -not (Test-LockProperty $component.source 'sha256')) {
+                        Throw-LockError 'LOCK_SOURCE_INTEGRITY' "Component '$($component.id)' is missing GitHub release integrity metadata."
+                    }
+                    $versionToken = [regex]::Escape([string]$component.version)
+                    if ($component.source.url -notmatch '^https://' -or $component.source.url -notmatch $versionToken -or $component.source.sha256 -notmatch '^[0-9a-f]{64}$') {
+                        Throw-LockError 'LOCK_SOURCE_INTEGRITY' "Component '$($component.id)' has invalid GitHub release integrity metadata."
+                    }
+                }
+                else { Throw-LockError 'LOCK_SOURCE_INTEGRITY' "Component '$($component.id)' has invalid GitHub release integrity state." }
             }
         }
     }

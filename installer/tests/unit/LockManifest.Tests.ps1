@@ -42,17 +42,23 @@ Describe 'components.lock.json contract' {
     It 'defines safe structured installation and verification metadata' {
         foreach ($component in $lock.components) {
             $component.required | Should -BeOfType [bool]
-            @($component.ownedTargets).GetType().Name | Should -Be 'Object[]'
-            @($component.dependencies).GetType().Name | Should -Be 'Object[]'
+            $component.install.allowed | Should -BeOfType [bool]
+            $component.integrityStatus | Should -BeIn @('verified', 'planning-only-unverified', 'not-applicable')
+            $component.source.kind | Should -BeIn @('winget', 'npm', 'python-package', 'github-release', 'repository-assets')
+            ($component.ownedTargets -is [array]) | Should -BeTrue
+            @($component.ownedTargets | Where-Object { $_ -isnot [string] }).Count | Should -Be 0
+            ($component.dependencies -is [array]) | Should -BeTrue
+            @($component.dependencies | Where-Object { $_ -isnot [string] }).Count | Should -Be 0
             $component.install.command | Should -Not -BeNullOrEmpty
             $component.install.command | Should -Not -Match '[;&|]'
-            @($component.install.arguments).GetType().Name | Should -Be 'Object[]'
+            ($component.install.arguments -is [array]) | Should -BeTrue
+            @($component.install.arguments | Where-Object { $_ -isnot [string] }).Count | Should -Be 0
             @($component.verificationIds).Count | Should -BeGreaterThan 0
         }
     }
 
     It 'uses immutable HTTPS URLs and SHA-256 hashes for GitHub releases' {
-        foreach ($component in @($lock.components | Where-Object { $_.source.kind -eq 'github-release' })) {
+        foreach ($component in @($lock.components | Where-Object { $_.source.kind -eq 'github-release' -and $_.integrityStatus -eq 'verified' })) {
             $component.source.url | Should -Match '^https://'
             $component.source.url | Should -Match ([regex]::Escape($component.version))
             $component.source.sha256 | Should -Match '^[0-9a-f]{64}$'
@@ -61,9 +67,16 @@ Describe 'components.lock.json contract' {
 
     It 'keeps Engram planning honest while its artifact integrity is unverified' {
         $engram = $lock.components | Where-Object id -EQ 'engram'
-        $engram.source.kind | Should -Be 'versioned-package'
+        $engram.source.kind | Should -Be 'github-release'
         $engram.integrityStatus | Should -Be 'planning-only-unverified'
         $engram.install.allowed | Should -BeFalse
+    }
+
+    It 'uses one canonical OpenCode root for runtime assets install and ownership' {
+        $runtimeAssets = $lock.components | Where-Object id -EQ 'runtime-assets'
+        $runtimeAssets.install.arguments | Should -Contain '${OPENCODE_KIT_ROOT}'
+        $runtimeAssets.ownedTargets | Should -Contain 'path:${OPENCODE_KIT_ROOT}'
+        ($runtimeAssets.install.arguments -join ' ') | Should -Not -Match 'CODEX_OVERLAY_ROOT'
     }
 
     It 'gives authenticated components concrete versioned configuration' {
@@ -170,6 +183,39 @@ Describe 'Read-ComponentLock validation' {
         { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_COMPONENT_OWNERSHIP_INVALID*'
     }
 
+    It 'rejects missing or non-boolean install allowed metadata' {
+        $document.components[0].install.PSObject.Properties.Remove('allowed')
+        $path = Join-Path $TestDrive 'allowed-missing.json'
+        $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_INSTALL_ALLOWED_INVALID*'
+
+        $document = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -Depth 30
+        $document.components[0].install.allowed = 'true'
+        $path = Join-Path $TestDrive 'allowed-type.json'
+        $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_INSTALL_ALLOWED_INVALID*'
+    }
+
+    It 'rejects missing or unknown integrity status' {
+        $document.components[0].PSObject.Properties.Remove('integrityStatus')
+        $path = Join-Path $TestDrive 'integrity-missing.json'
+        $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_INTEGRITY_STATUS_INVALID*'
+
+        $document = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -Depth 30
+        $document.components[0].integrityStatus = 'unknown'
+        $path = Join-Path $TestDrive 'integrity-unknown.json'
+        $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_INTEGRITY_STATUS_INVALID*'
+    }
+
+    It 'rejects unknown source kinds' {
+        $document.components[0].source.kind = 'remote-script'
+        $path = Join-Path $TestDrive 'source-kind.json'
+        $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_SOURCE_KIND_INVALID*'
+    }
+
     It 'rejects changed pack membership and missing dependency references with stable codes' {
         $document.packs.core[0] = 'missing-pack-component'
         $path = Join-Path $TestDrive 'pack-reference.json'
@@ -194,6 +240,48 @@ Describe 'Read-ComponentLock validation' {
         $path = Join-Path $TestDrive 'arguments.json'
         $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
         { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_INSTALL_ARGUMENTS*'
+
+        $document = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -Depth 30
+        $document.components[0].install.arguments = @([pscustomobject]@{ value = 'install' })
+        $path = Join-Path $TestDrive 'argument-object.json'
+        $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_INSTALL_ARGUMENTS*'
+    }
+
+    It 'rejects scalar and non-string dependency or ownership arrays' {
+        $document.components[0].dependencies = 'node'
+        $path = Join-Path $TestDrive 'dependencies-scalar.json'
+        $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_DEPENDENCIES*'
+
+        $document = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -Depth 30
+        $document.components[0].ownedTargets = @([pscustomobject]@{ path = 'git.exe' })
+        $path = Join-Path $TestDrive 'ownership-object.json'
+        $document | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_COMPONENT_OWNERSHIP_INVALID*'
+    }
+
+    It 'requires metadata appropriate to each source kind' {
+        foreach ($case in @(
+            @{ Name = 'winget'; Id = 'git'; Field = 'id'; Code = 'LOCK_SOURCE_METADATA_INVALID*' },
+            @{ Name = 'npm'; Id = 'pnpm'; Field = 'package'; Code = 'LOCK_SOURCE_METADATA_INVALID*' },
+            @{ Name = 'python'; Id = 'graphify'; Field = 'package'; Code = 'LOCK_SOURCE_METADATA_INVALID*' },
+            @{ Name = 'assets'; Id = 'runtime-assets'; Field = 'sourcePath'; Code = 'LOCK_SOURCE_METADATA_INVALID*' }
+        )) {
+            $candidate = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -Depth 30
+            $component = $candidate.components | Where-Object id -EQ $case.Id
+            $component.source.PSObject.Properties.Remove($case.Field)
+            $path = Join-Path $TestDrive "source-$($case.Name).json"
+            $candidate | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+            { Read-ComponentLock -Path $path } | Should -Throw $case.Code
+        }
+
+        $candidate = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -Depth 30
+        $engram = $candidate.components | Where-Object id -EQ 'engram'
+        $engram.install.allowed = $true
+        $path = Join-Path $TestDrive 'engram-planning-allowed.json'
+        $candidate | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_SOURCE_INTEGRITY*'
     }
 
     It 'rejects empty verification IDs and invalid GitHub release integrity' {
