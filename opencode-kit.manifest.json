@@ -39,6 +39,22 @@
         "gentle-alignment-docs",
         "validation-harness"
       ]
+    },
+    "codex": {
+      "description": "Codex-first Manager, skills and memory governance overlay",
+      "components": ["docs-core", "codex-manager-template", "codex-skills", "codex-memory-governance"]
+    },
+    "codex-full": {
+      "description": "Codex-first full runtime kit with Manager, SDD, memory, context packs and validation harness",
+      "components": [
+        "docs-core",
+        "templates-core",
+        "codex-manager-template",
+        "codex-skills",
+        "sdd-templates",
+        "memory-governance",
+        "validation-harness"
+      ]
     }
   },
   "components": [
@@ -86,6 +102,21 @@
       "id": "validation-harness",
       "type": "script",
       "paths": ["scripts/doctor.mjs", "scripts/validate.mjs", "scripts/sanitize-check.mjs"]
+    },
+    {
+      "id": "codex-manager-template",
+      "type": "agent-template",
+      "paths": ["templates/codex/AGENTS.codex.example.md"]
+    },
+    {
+      "id": "codex-skills",
+      "type": "skill-template",
+      "paths": ["skills/manager-router", "skills/memory-governance", "skills/context-pack-builder", "skills/token-budgeter"]
+    },
+    {
+      "id": "codex-memory-governance",
+      "type": "docs",
+      "paths": ["docs/codex-runtime.md", "docs/memory-governance.md"]
     }
   ]
 }

@@ -11,7 +11,9 @@ export const requiredProfiles = [
   "memory-enabled",
   "ponytail-code-gate",
   "gentle-alignment",
-  "full"
+  "full",
+  "codex",
+  "codex-full"
 ];
 
 export const requiredDirectories = [

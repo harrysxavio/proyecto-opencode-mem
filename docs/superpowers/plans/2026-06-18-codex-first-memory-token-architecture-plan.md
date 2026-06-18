@@ -54,7 +54,7 @@ Include:
 
 Include concrete phases, files, tests, and commands.
 
-- [ ] **Step 3: Run documentation checks**
+- [x] **Step 3: Run documentation checks**
 
 Run:
 
@@ -64,7 +64,7 @@ node scripts/docs-check.mjs
 
 Expected: PASS.
 
-- [ ] **Step 4: Run sanitizer**
+- [x] **Step 4: Run sanitizer**
 
 Run:
 
@@ -74,7 +74,7 @@ node scripts/sanitize-check.mjs
 
 Expected: PASS or only known/intentional warnings. If a proposal path triggers absolute-path sanitizer, update sanitizer allowlist only if the path appears in documentation as user-local evidence and not exportable config.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add docs/proposals/2026-06-18-codex-first-memory-token-architecture.md docs/superpowers/plans/2026-06-18-codex-first-memory-token-architecture-plan.md
@@ -90,7 +90,7 @@ git commit -m "docs: add codex-first memory token architecture plan"
 - Test: `tests/unit/manifest.test.mjs`
 - Test: `tests/unit/profiles.test.mjs`
 
-- [ ] **Step 1: Add failing tests**
+- [x] **Step 1: Add failing tests**
 
 Add assertions that profiles `codex` and `codex-full` exist and reference only portable paths.
 
@@ -109,7 +109,7 @@ Expected profile intent:
 }
 ```
 
-- [ ] **Step 2: Run tests to verify failure**
+- [x] **Step 2: Run tests to verify failure**
 
 ```powershell
 node --test tests/unit/manifest.test.mjs tests/unit/profiles.test.mjs
@@ -117,11 +117,11 @@ node --test tests/unit/manifest.test.mjs tests/unit/profiles.test.mjs
 
 Expected: FAIL because profiles/components do not exist.
 
-- [ ] **Step 3: Update manifest minimally**
+- [x] **Step 3: Update manifest minimally**
 
 Add `codex`, `codex-full`, and components pointing to future files.
 
-- [ ] **Step 4: Run tests to verify pass**
+- [x] **Step 4: Run tests to verify pass**
 
 ```powershell
 node --test tests/unit/manifest.test.mjs tests/unit/profiles.test.mjs
@@ -130,7 +130,7 @@ node scripts/validate.mjs
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add opencode-kit.manifest.json tests/unit/manifest.test.mjs tests/unit/profiles.test.mjs
