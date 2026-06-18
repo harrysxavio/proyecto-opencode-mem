@@ -358,7 +358,7 @@ git commit -m "feat: add memory lint and token reporting"
 - Create: `tests/integration/codex-overlay-dry-run.test.mjs`
 - Modify: `package.json`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Tests must prove:
 - dry-run writes nothing;
@@ -367,7 +367,7 @@ Tests must prove:
 - OpenCode binary directory is rejected;
 - rollback metadata is created.
 
-- [ ] **Step 2: Implement dry-run first**
+- [x] **Step 2: Implement dry-run first**
 
 Support:
 
@@ -375,11 +375,11 @@ Support:
 node scripts/install-codex-overlay.mjs --dry-run --target tests/tmp/codex-home
 ```
 
-- [ ] **Step 3: Implement temp install**
+- [x] **Step 3: Implement temp install**
 
 Support install into fixture target only during tests.
 
-- [ ] **Step 4: Implement doctor**
+- [x] **Step 4: Implement doctor**
 
 Doctor checks:
 - required files exist;
@@ -388,14 +388,14 @@ Doctor checks:
 - no private absolute paths;
 - rollback metadata exists after install.
 
-- [ ] **Step 5: Add package scripts**
+- [x] **Step 5: Add package scripts**
 
 ```json
 "install:codex:dry-run": "node scripts/install-codex-overlay.mjs --dry-run",
 "codex:doctor": "node scripts/codex-doctor.mjs"
 ```
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 ```powershell
 node --test tests/unit/install-codex-overlay.test.mjs tests/integration/codex-overlay-dry-run.test.mjs
@@ -404,7 +404,7 @@ pnpm install:codex:dry-run
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add scripts/install-codex-overlay.mjs scripts/codex-doctor.mjs tests/unit/install-codex-overlay.test.mjs tests/integration/codex-overlay-dry-run.test.mjs package.json

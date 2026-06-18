@@ -19,7 +19,9 @@
     "skills:registry": "node scripts/skill-registry-generate.mjs",
     "context:check": "node scripts/context-pack-check.mjs",
     "memory:lint": "node scripts/memory-lint.mjs",
-    "tokens:report": "node scripts/token-budget-report.mjs"
+    "tokens:report": "node scripts/token-budget-report.mjs",
+    "install:codex:dry-run": "node scripts/install-codex-overlay.mjs --dry-run",
+    "codex:doctor": "node scripts/codex-doctor.mjs"
   },
   "engines": {
     "node": ">=20"
