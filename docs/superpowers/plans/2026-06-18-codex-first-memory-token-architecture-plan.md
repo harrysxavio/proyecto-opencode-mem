@@ -203,11 +203,11 @@ git commit -m "feat: add codex manager overlay template"
 - Create: `skills/token-budgeter/SKILL.md`
 - Modify: `package.json`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Test that generator reads `skills/*/SKILL.md` and writes `.atl/skill-registry.md` with name, description, trigger, and path.
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 ```powershell
 node --test tests/unit/skill-registry-generate.test.mjs
@@ -215,15 +215,15 @@ node --test tests/unit/skill-registry-generate.test.mjs
 
 Expected: FAIL.
 
-- [ ] **Step 3: Implement minimal generator**
+- [x] **Step 3: Implement minimal generator**
 
 Use Node `fs/promises` and parse frontmatter conservatively.
 
-- [ ] **Step 4: Add initial skills**
+- [x] **Step 4: Add initial skills**
 
 Each `SKILL.md` must be narrow and point to docs instead of copying full docs.
 
-- [ ] **Step 5: Add package script**
+- [x] **Step 5: Add package script**
 
 Add:
 
@@ -231,17 +231,17 @@ Add:
 "skills:registry": "node scripts/skill-registry-generate.mjs"
 ```
 
-- [ ] **Step 6: Run tests and generator**
+- [x] **Step 6: Run tests and generator**
 
 ```powershell
 node --test tests/unit/skill-registry-generate.test.mjs
-pnpm skills:registry
+npm run skills:registry
 node scripts/sanitize-check.mjs
 ```
 
 Expected: PASS and `.atl/skill-registry.md` generated without private paths.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add scripts/skill-registry-generate.mjs tests/unit/skill-registry-generate.test.mjs skills package.json .atl/skill-registry.md

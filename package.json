@@ -15,7 +15,8 @@
     "install:temp": "node scripts/install-temp.mjs",
     "backup:plan": "node scripts/backup.mjs --plan",
     "rollback:plan": "node scripts/rollback.mjs --plan",
-    "export:inventory": "node scripts/export-inventory.mjs"
+    "export:inventory": "node scripts/export-inventory.mjs",
+    "skills:registry": "node scripts/skill-registry-generate.mjs"
   },
   "engines": {
     "node": ">=20"
