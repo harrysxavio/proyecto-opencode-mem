@@ -197,65 +197,266 @@ Codex ejecuta el **Manager overlay** con skills portables y memoria propia. El f
 
 ---
 
-## 6. Qué es la memoria en esta arquitectura
+## 6. Memoria persistente: cómo funciona
 
-La memoria es **persistente entre sesiones**. Guarda:
-- Decisiones arquitectónicas.
-- Bugs y su causa raíz.
-- Descubrimientos no obvios.
-- Preferencias del usuario.
-- Patrones reusables.
+La memoria en este kit es **persistente entre sesiones**. No es memoria de conversación (el asistente no recuerda cada mensaje), sino **memoria de decisiones**: guarda lo que tiene valor futuro para que el asistente lo recuerde en la próxima sesión.
 
-**No guarda**: prompts crudos, logs, secretos, código fuente, fallos transitorios.
+### ¿Qué se guarda?
+
+| Tipo de memoria | Ejemplo concreto |
+|----------------|------------------|
+| **Decisión arquitectónica** | "Elegimos PostgreSQL sobre MySQL por las funciones de array" |
+| **Bug con causa raíz** | "El error de login era por cookie sin SameSite=Strict, no por el token" |
+| **Descubrimiento no obvio** | "La API de pagos rechaza montos con más de 2 decimales" |
+| **Preferencia del usuario** | "El usuario quiere commits en español y prefiere convención conventional-commits" |
+| **Patrón reusable** | "Para validar emails, usamos la regex de OWASP, no una custom" |
+| **Session summary** | Resumen de todo lo que se hizo en la sesión actual |
+
+**NO se guarda nunca**: mensajes de conversación, logs de compilación, secretos, contraseñas, código fuente completo, errores transitorios ("no encontré el archivo", "intentá de nuevo").
+
+### ¿Cómo se guarda? (mecánica concreta)
+
+Cuando ocurre un evento relevante, el Manager llama a `mem_save` con esta estructura:
+
+```
+mem_save(
+  title: "Elegimos PostgreSQL sobre MySQL",
+  type: "decision",
+  scope: "project",
+  topic_key: "database/choice-postgresql",
+  content: "
+    **What**: Reemplazamos MySQL por PostgreSQL
+    **Why**: Necesitábamos funciones de array para el módulo de reporting
+    **Where**: docker-compose.yml, prisma/schema.prisma
+    **Learned**: La migración no fue tan cara porque Prisma abstrae las diferencias
+  "
+)
+```
+
+**Qué pasa internamente**:
+
+1. Engram recibe el llamado.
+2. Asigna un **ID único** (ej: `480`) y un `sync_id` (`obs-f45f86aa09a86323`).
+3. Si hay conflictos con memorias existentes, pide revisión (ver sección Noise Gate abajo).
+4. La memoria queda disponible para futuras sesiones vía `mem_context` o `mem_search`.
+
+### ¿Cómo se recupera?
+
+Cuando empezás una nueva sesión y preguntás "¿qué hicimos con la base de datos?", el Manager ejecuta este flujo:
+
+```
+Pregunta: "¿qué hicimos con la base de datos?"
+  → 1. mem_context() → busca sesiones recientes (rápido, barato en tokens)
+  → 2. Si encuentra sesiones, las muestra con resumen
+  → 3. Si NO encuentra, mem_search("base de datos") → búsqueda por keywords (FTS5)
+  → 4. De los resultados, usa F4C Selector para rankear
+  → 5. Solo toma las observaciones más relevantes (top 3-5)
+  → 6. Responde con el contexto recuperado
+```
+
+### F4C Memory Context Selector (el sistema de ranking)
+
+Cuando hay múltiples memorias, el Manager no las carga todas — las **rankea** por:
+
+| Factor | Peso | Por qué |
+|--------|------|---------|
+| **Relevancia** | 50% | Qué tan relacionada está con lo que preguntaste |
+| **Recencia** | 30% | Las decisiones recientes importan más que las viejas (decaen 5% por día) |
+| **Tipo** | 20% | `decision` > `constraint` > `architecture` > `bugfix` > `discovery` > `config` |
+
+**Ejemplo**: Si preguntás "¿qué base de datos usamos?", el Manager va a rankear:
+1. ✅ `database/choice-postgresql` (decisión, 2 días atrás) — score alto
+2. ⚠️ `database/migration-notes` (descubrimiento, 1 semana atrás) — score medio
+3. ❌ `database/connection-string` (config, 3 meses atrás) — score bajo, probablemente descartado
+
+Las memorias con el mismo `topic_key` se deduplican: solo queda la de mayor score.
 
 ---
 
-## 7. Archivos de memoria y archivos relacionados
+## 7. Memoria entre sesiones: el flujo completo
 
-| Archivo | Propósito |
-|---------|-----------|
-| `contracts/memory-governance.md` | Reglas de escritura/recuperación |
-| `contracts/noise-gate.md` | Filtro antes de guardar |
-| `opencode/manager.template.md` | Manager con auto-triggers Engram |
-| `codex/scripts/memory-lint.mjs` | Validador de archivos de memoria |
+Así funciona en la práctica con una sesión real de este mismo repositorio:
+
+### Sesión 1 (día 1)
+
+```
+Usuario: "Agrega una función de validación de emails al proyecto"
+
+Manager: Clasifica como Small, implementa, y al cerrar la sesión ejecuta:
+→ mem_session_summary(
+    Goal: "Agregar validación de emails"
+    Accomplished: ✅ isEmailValid() en lib/validators.ts
+    Next Steps: []
+    Relevant Files: lib/validators.ts, lib/validators.test.ts
+  )
+→ mem_save(
+    title: "isEmailValid con regex OWASP",
+    type: "pattern",
+    topic_key: "validation/email-pattern"
+  )
+```
+
+### Entre sesiones
+
+Los datos persisten:
+- **OpenCode**: Engram MCP (servidor externo con base de datos dedicada)
+- **Codex**: SQLite nativa (`memories_1.sqlite`)
+
+No se pierden al cerrar el editor, apagar la PC, o cambiar de proyecto.
+
+### Sesión 2 (día 2, sesión nueva)
+
+```
+Usuario: "Acordate de la validación de emails que hicimos ayer"
+
+Manager (al recibir el mensaje):
+→ 1. mem_context(project="mi-proyecto")
+   → Encuentra: "Session summary: ... mi-proyecto" con Accomplished + Relevant Files
+→ 2. mem_search("validación emails")
+   → Encuentra: "isEmailValid con regex OWASP" (observación #42)
+→ 3. Responde:
+   "Sí, ayer creamos isEmailValid() en lib/validators.ts usando la regex de OWASP.
+    ¿Necesitás modificarla o agregar algo?"
+```
+
+**Esto funciona aunque:**
+
+- Hayas cerrado el editor.
+- Hayas apagado la computadora.
+- Hayas trabajado en otro proyecto entre medio.
+- Hayan pasado días o semanas (las memorias no expiran, solo bajan de ranking).
 
 ---
 
-## 8. Noise Gate: qué es y por qué quita ruido
+## 8. Noise Gate: el filtro que decide qué merece guardarse
 
-El Noise Gate clasifica cada interacción como `instruction`, `question`, `confirmation`, `navigation` o `noise`. Solo las `instruction` con valor futuro o decisiones durables merecen guardarse en memoria.
+El Noise Gate no es un "plugin" que se instala. Es una **regla que el Manager sigue** antes de cada `mem_save`: clasificar la interacción y decidir si tiene valor futuro.
 
-**Ver**: [`contracts/noise-gate.md`](contracts/noise-gate.md) para las reglas completas.
+### Las 5 clases
+
+| Clase | Significa | Ejemplo real | ¿Se guarda? |
+|-------|-----------|-------------|-------------|
+| **`instruction`** | El usuario pide trabajo o fija una decisión | "Cambiá la fuente de datos a PostgreSQL" | ✅ Si tiene valor futuro |
+| **`question`** | El usuario pregunta algo | "¿Cómo se configura el rate limiting?" | ❌ |
+| **`confirmation`** | El usuario aprueba, niega o continua | "Sí, aprobado", "dale", "ok" | ❌ |
+| **`navigation`** | El usuario pide ver/abrir/inspeccionar | "Mostrame el archivo .env", "listá los tests" | ❌ |
+| **`noise`** | Chatter, errores, texto pegado accidental | "ups", "jaja", "no funcionó" (sin contexto) | ❌ |
+
+### El flujo de decisión
+
+Cada vez que el Manager considera guardar algo, hace estas preguntas:
+
+```
+¿La interacción es una instrucción con valor futuro?
+  → NO: no guardar (es question, confirmation, navigation o noise)
+  → SÍ: seguir preguntando
+
+¿Se tomó una decisión durable?
+  → NO: no guardar
+  → SÍ: guardar con type="decision"
+
+¿Se corrigió un bug con causa raíz conocida?
+  → NO: seguir
+  → SÍ: guardar con type="bugfix"
+
+¿Se descubrió algo no obvio?
+  → NO: seguir
+  → SÍ: guardar con type="discovery"
+
+¿Se estableció una preferencia reusable?
+  → NO: no guardar
+  → SÍ: guardar con type="preference" o type="pattern"
+```
+
+### Ejemplos concretos de filtrado
+
+**Entra** (se guarda):
+> "A partir de ahora, todos los commits en español con conventional-commits"
+
+→ Clasificación: `instruction` (establece preferencia reusable) → se guarda como `preference`
+
+**No entra** (no se guarda):
+> "mostrame la carpeta src"
+
+→ Clasificación: `navigation` → no se guarda
+
+**Entra** (se guarda):
+> "El bug era que el webhook fallaba porque faltaba el header X-Signature. Lo fixeamos en `lib/webhooks.ts`"
+
+→ Clasificación: `instruction` (describe un bug con causa raíz) → se guarda como `bugfix`
+
+**No entra** (no se guarda):
+> "sí, está bien"
+
+→ Clasificación: `confirmation` → no se guarda
+
+### ¿Por qué es importante?
+
+Sin Noise Gate, el Manager guardaría TODO: cada "sí", cada "mostrame", cada "jaja". La memoria se llenaría de ruido y las búsquedas serían inútiles. Con Noise Gate, la memoria tiene **señal, no ruido**.
 
 ---
 
-## 9. Tokens: explicación simple
+## 9. Tokens: presupuesto y disciplina
 
 Los tokens son el "papel" donde el asistente escribe su contexto. Este kit optimiza el uso de ese papel:
 
-1. **Contexto fijo**: lo que siempre está presente (poco).
-2. **Contexto dinámico**: lo que se carga bajo demanda (skills, docs largos).
-3. **Context packs**: paquetes mínimos para subagentes.
+| Tipo de contexto | Qué incluye | Tamaño típico |
+|-----------------|-------------|---------------|
+| **Contexto fijo** | Instrucciones del Manager (siempre presente) | Pequeño (~2-5% del presupuesto) |
+| **Contexto dinámico** | Skills cargados por trigger, docs largos | Mediano, bajo demanda |
+| **Context packs** | Paquetes mínimos para subagentes (SDD) | Pequeño, solo lo necesario |
+| **Memoria recuperada** | Observaciones de sesiones anteriores | Pequeño, top 3-5 rankeadas |
+
+**Principio**: cargar solo lo que se necesita en el momento, no todo el proyecto siempre.
 
 **Ver**: [`contracts/token-discipline.md`](contracts/token-discipline.md)
 
 ---
 
-## 10. Memoria entre sesiones y memoria persistente
+## 10. Validación: evidencia de que la memoria entre sesiones funciona
 
-### Flujo de memoria entre sesiones
+Este repositorio es la **prueba viviente** de que la memoria persistente funciona. Toda la documentación que estás leyendo, las decisiones arquitectónicas, y los bugs fixeados se guardaron usando este mismo sistema.
 
-1. **Sesión 1**: trabajas, se guardan decisiones y descubrimientos, al cerrar se ejecuta `mem_session_summary`.
-2. **Entre sesiones**: los datos persisten en Engram (OpenCode) o SQLite (Codex).
-3. **Sesión 2**: al empezar, el Manager busca contexto de sesiones anteriores.
+### Datos reales de este repositorio
 
-### Reglas de retrieval
+```
+$ mem_context(project="opencode-architecture")
 
-1. Intentar contexto de sesión reciente (`mem_context`).
-2. Si no se encuentra, búsqueda por keywords (`mem_search`).
-3. Observación completa solo si es relevante.
+→ 5 sesiones activas
+→ 44 observaciones en la sesión principal
+→ 379 observaciones totales en el proyecto
+→ 14 sesiones a lo largo de 10 días
+```
 
-**Ver**: [`contracts/memory-governance.md`](contracts/memory-governance.md)
+### Ejemplos de memorias reales guardadas durante el desarrollo
+
+| Título | Tipo | Cuándo | Valor |
+|--------|------|--------|-------|
+| "v0.2.0 release — unified dual-runtime architecture" | decision | Hoy | Sabe que la release está completa |
+| "Updated quickstarts and README with architecture flows" | architecture | Hoy | Sabe que se mejoraron los docs |
+| "Completed Fase 6 cleanup for unified architecture" | architecture | Hoy | Sabe que la limpieza está hecha |
+| "Fixed gentle-ai runtime test regex" | bugfix | Ayer | Sabe cómo se fixeó el test |
+| "Chose Zustand over Redux" | decision | Sem. pasada | Sabe por qué se eligió Zustand |
+| "Session summary: opencode-architecture" | session_summary | Cada sesión | Resumen de lo que se hizo |
+
+### Cómo probarlo vos mismo
+
+1. **Instalá el kit** siguiendo el [QuickStart correspondiente](QUICKSTART_OPENCODE.md).
+2. **Hacé una pregunta**: "Acordate de que estamos probando la memoria"
+3. **El Manager guarda** la preferencia.
+4. **Cerá la sesión**, abrí una nueva.
+5. **Preguntá**: "¿De qué estábamos hablando?"
+6. El Manager va a buscar `mem_context()` y responder basado en la sesión anterior.
+
+### ¿Qué pasa si no hay memoria?
+
+Si es la primera vez que usás el kit o no hay sesiones previas, el Manager responde honestamente:
+
+> "No encontré sesiones anteriores en este proyecto. Es la primera vez que trabajamos juntos aquí."
+
+No inventa contexto falso. Eso también es parte del diseño.
+
+**Ver**: [`contracts/memory-governance.md`](contracts/memory-governance.md) para las reglas completas.
 
 ---
 
