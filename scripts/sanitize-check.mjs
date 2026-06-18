@@ -11,7 +11,7 @@ const forbiddenFragments = [
   ["A", "K", "I", "A"].join("")
 ];
 const forbiddenPatterns = [
-  new RegExp(`${["s", "k", "-"].join("")}[A-Za-z0-9_-]{20,}`, "u")
+  new RegExp(`(?:^|[^A-Za-z0-9])${["s", "k", "-"].join("")}[A-Za-z0-9_-]{20,}`, "u")
 ];
 
 const forbiddenPathExtensions = new Set([".db", ".sqlite", ".sqlite3", ".bak", ".log"]);
