@@ -56,24 +56,148 @@ Este kit prioriza **calidad de contexto sobre cantidad**. En lugar de cargar tod
 
 ---
 
-## 3. Flujo completo de una petición
+## 3. Arquitectura para OpenCode
+
+OpenCode ejecuta el **Manager Global** con subagentes y gates. Cada solicitud del usuario pasa por un flujo estructurado:
 
 ```
-Usuario → Manager clasifica (Tiny/Small/Medium/Large)
-  → [Medium+] Diseño + aprobación
-  → [Large] Graphify Context Gate
-  → SDD Pipeline (Explore → Propose → Spec → Design → Tasks → Apply → Verify → Archive)
-  → Code Review / Judgment Day
-  → GPT-5.5 Review
-  → Memory Governance (session summary)
-  → Respuesta
+┌──────────────────────────────────────────────────────┐
+│                    USUARIO                            │
+│  "Agrega autenticación con Google al proyecto"       │
+└────────────────────┬─────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────┐
+│  1. MANAGER CLASIFICA                                │
+│     Tiny → respuesta directa                         │
+│     Small → intake corto + diseño + aplicar          │
+│     Medium/Large → pipeline completo                 │
+│     "Esto es Medium: múltiples archivos, API"        │
+└────────────────────┬─────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────┐
+│  2. SUPERPOWERS BRAINSTORMING (Intake)               │
+│     ¿Qué problema resuelve? ¿Qué archivos?           │
+│     ¿Qué NO debe tocarse?                            │
+│     → Diseño con 2-3 enfoques                        │
+│     → "¿Apruebas este diseño?"                       │
+└────────────────────┬─────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────┐
+│  3. GRAPHIFY CONTEXT GATE  (si 4+ archivos)          │
+│     "Buscá relaciones entre auth y database"         │
+│     → Mapa de archivos afectados                     │
+└────────────────────┬─────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────┐
+│  4. SDD PIPELINE (8 fases)                           │
+│     Explore → Propose → Spec → Design                │
+│     → Tasks → Apply → Verify → Archive               │
+│     Cada fase delega a un subagente @sdd-*           │
+└────────────────────┬─────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────┐
+│  5. QUALITY GATES                                    │
+│     Code Review / Judgment Day                       │
+│     GPT-5.5 OAuth Review                             │
+└────────────────────┬─────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────┐
+│  6. MEMORIA + RESPUESTA                              │
+│     mem_session_summary → guarda lo aprendido        │
+│     "Listo. 3 archivos modificados, tests pasan."    │
+└──────────────────────────────────────────────────────┘
 ```
 
-Cada fase tiene su contrato en [`contracts/`](contracts/) y su implementación en el adaptador runtime correspondiente.
+**Ejemplo concreto**: Pedís "Agrega un comando `format` al Makefile que ejecute Prettier".  
+→ Manager clasifica como **Small** (1 archivo, cambio mecánico)  
+→ Intake corto: "¿Solo Prettier o también ESLint?"  
+→ Diseño breve + aprobación  
+→ Aplica el cambio en `Makefile`  
+→ Verifica que `make format` funcione  
+→ Code Review  
+→ Responde con el diff y confirmación
 
 ---
 
-## 4. Qué es la memoria en esta arquitectura
+## 4. Arquitectura para Codex
+
+Codex ejecuta el **Manager overlay** con skills portables y memoria propia. El flujo es más liviano que OpenCode porque Codex no tiene subagentes nativos:
+
+```
+┌──────────────────────────────────────────────────────┐
+│                    USUARIO                            │
+│  "Hacé un diagrama de flujo del login"               │
+└────────────────────┬─────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────┐
+│  1. MANAGER CLASSIFICA                               │
+│     ¿Es una pregunta? → responde directo             │
+│     ¿Necesita un skill? → carga el skill             │
+│     ¿Necesita memoria? → busca en mem_context        │
+└────────────────────┬─────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────┐
+│  2. MEMORIA + CONTEXTO                               │
+│     Busca sesiones anteriores (mem_context)           │
+│     Arma context pack mínimo para la tarea           │
+└────────────────────┬─────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────┐
+│  3. SKILL LAZY-LOADING                               │
+│     "diagrama de flujo" → carga skill flow-diagram   │
+│     "creá una PR" → carga branch-pr + work-unit-*   │
+│     "auditá la UI" → carga web-design-guidelines     │
+└────────────────────┬─────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────┐
+│  4. EJECUCIÓN + VERIFICACIÓN                         │
+│     El skill ejecuta su workflow                     │
+│     Manager verifica el resultado                    │
+└────────────────────┬─────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────┐
+│  5. MEMORIA + RESPUESTA                              │
+│     Guarda en memoria si es decisión o descubrimiento│
+│     "Acá tenés el diagrama ASCII del flujo login"   │
+└──────────────────────────────────────────────────────┘
+```
+
+**Ejemplo concreto**: Pedís "Creá una Pull Request para el fix de caché".  
+→ Manager busca memoria: "¿había contexto de este fix?"  
+→ Carga `branch-pr` + `work-unit-commits`  
+→ `work-unit-commits` planifica los commits  
+→ `branch-pr` crea la PR con descripción  
+→ Manager verifica que la PR se creó correctamente  
+→ Guarda en memoria: "PR #42 creada para fix de caché"
+
+---
+
+## 5. Comparación: flujo OpenCode vs flujo Codex
+
+| Aspecto | OpenCode | Codex |
+|---------|----------|-------|
+| **Subagentes** | `@sdd-*` para cada fase SDD | No tiene subagentes nativos |
+| **Gates** | Graphify, Frontend, Judgment Day, GPT-5.5 | Skills portables + verificación inline |
+| **Memoria** | Engram MCP (servidor externo) | SQLite nativa + scripts memory-lint |
+| **Instalación** | Overlay sobre AGENTS.md | Overlay sobre AGENTS.md |
+| **Skills** | Cargados por trigger como subagentes | 18 skills portables cargados por trigger |
+| **Complejidad** | Alta (proyectos grandes, Medium/Large) | Media (proyectos pequeños/medianos) |
+| **Mejor para** | Equipos, APIs, auth, producción | Proyectos personales, scripts, experimentos |
+
+---
+
+## 6. Qué es la memoria en esta arquitectura
 
 La memoria es **persistente entre sesiones**. Guarda:
 - Decisiones arquitectónicas.
@@ -86,7 +210,7 @@ La memoria es **persistente entre sesiones**. Guarda:
 
 ---
 
-## 5. Archivos de memoria y archivos relacionados
+## 7. Archivos de memoria y archivos relacionados
 
 | Archivo | Propósito |
 |---------|-----------|
@@ -97,7 +221,7 @@ La memoria es **persistente entre sesiones**. Guarda:
 
 ---
 
-## 6. Noise Gate: qué es y por qué quita ruido
+## 8. Noise Gate: qué es y por qué quita ruido
 
 El Noise Gate clasifica cada interacción como `instruction`, `question`, `confirmation`, `navigation` o `noise`. Solo las `instruction` con valor futuro o decisiones durables merecen guardarse en memoria.
 
@@ -105,7 +229,7 @@ El Noise Gate clasifica cada interacción como `instruction`, `question`, `confi
 
 ---
 
-## 7. Tokens: explicación simple
+## 9. Tokens: explicación simple
 
 Los tokens son el "papel" donde el asistente escribe su contexto. Este kit optimiza el uso de ese papel:
 
@@ -117,7 +241,7 @@ Los tokens son el "papel" donde el asistente escribe su contexto. Este kit optim
 
 ---
 
-## 8. Memoria entre sesiones y memoria persistente
+## 10. Memoria entre sesiones y memoria persistente
 
 ### Flujo de memoria entre sesiones
 
@@ -135,7 +259,7 @@ Los tokens son el "papel" donde el asistente escribe su contexto. Este kit optim
 
 ---
 
-## 9. Ponytail: contra la sobreingeniería
+## 11. Ponytail: contra la sobreingeniería
 
 Antes de implementar, preguntar:
 1. ¿Esto necesita existir?
@@ -150,7 +274,7 @@ Antes de implementar, preguntar:
 
 ---
 
-## 10. Regla final para mantener la arquitectura sana
+## 12. Regla final para mantener la arquitectura sana
 
 1. **No mezclar niveles**: lo portable va en `contracts/`, lo runtime-specific en `opencode/` o `codex/`.
 2. **Validar antes de commit**: `pnpm test:all` debe pasar.
@@ -160,7 +284,7 @@ Antes de implementar, preguntar:
 
 ---
 
-## 11. Estado actual
+## 13. Estado actual
 
 | Fase | Estado |
 |------|--------|
@@ -169,14 +293,15 @@ Antes de implementar, preguntar:
 | Fase 2 — Adaptador OpenCode | ✅ |
 | Fase 3 — Adaptador Codex | ✅ |
 | Fase 4 — README + QuickStarts | ✅ |
-| Fase 5 — Tests y CI | 🔲 |
-| Fase 6 — Limpieza y release | 🔲 |
+| Fase 5 — Tests y CI | ✅ |
+| Fase 6 — Limpieza y release | ✅ |
 
-**Ver**: [`docs/plan-unificacion/PLAN.md`](docs/plan-unificacion/PLAN.md) para el plan detallado.
+Todas las fases del plan de unificación están completadas.  
+**Ver**: [`docs/plan-unificacion/PLAN.md`](docs/plan-unificacion/PLAN.md) para el detalle.
 
 ---
 
-## 12. Cómo validar
+## 14. Cómo validar
 
 ```bash
 pnpm validate              # Validación de manifiesto
@@ -184,14 +309,16 @@ pnpm test:all              # Todos los tests (shared + codex + opencode)
 pnpm docs:check            # Chequeo de documentación
 pnpm codex:doctor          # Doctor Codex
 pnpm codex:install:dry-run # Simular instalación Codex
+pnpm opencode:doctor       # Doctor OpenCode
 ```
 
 ---
 
-## 13. Rollback
+## 15. Rollback
 
 ```bash
-pnpm codex:rollback --target ~/.codex   # Codex
+pnpm codex:rollback --target ~/.codex       # Codex
+pnpm opencode:rollback --target ~/.config/opencode  # OpenCode
 ```
 
 El instalador siempre respalda antes de escribir.

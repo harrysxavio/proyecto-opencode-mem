@@ -31,7 +31,8 @@ const REQUIRED_DOCS = [
 
 const REQUIRED_README_SECTIONS = [
   "personas no t?cnicas",
-  "Flujo completo",
+  "Arquitectura para OpenCode",
+  "Arquitectura para Codex",
   "memoria",
   "Noise Gate",
   "Tokens",
@@ -43,7 +44,8 @@ const REQUIRED_README_SECTIONS = [
 
 const REQUIRED_README_HEADINGS_PATTERNS = [
   /^##+\s+.*personas no t.cnicas/im,
-  /^##+\s+.*Flujo completo/im,
+  /^##+\s+.*Arquitectura para OpenCode/im,
+  /^##+\s+.*Arquitectura para Codex/im,
   /^##+\s+.*memoria/im,
   /^##+\s+.*Noise Gate/im,
   /^##+\s+.*Tokens/im,
