@@ -8,8 +8,10 @@ const forbiddenFragments = [
   ["C:", "Users", "harry"].join("\\"),
   ["harry", "syusti"].join(""),
   ["g", "h", "p", "_"].join(""),
-  ["s", "k", "-"].join(""),
   ["A", "K", "I", "A"].join("")
+];
+const forbiddenPatterns = [
+  new RegExp(`${["s", "k", "-"].join("")}[A-Za-z0-9_-]{20,}`, "u")
 ];
 
 const forbiddenPathExtensions = new Set([".db", ".sqlite", ".sqlite3", ".bak", ".log"]);
@@ -67,6 +69,9 @@ export async function scanPath(root = repoRoot, options = {}) {
 
     for (const fragment of forbiddenFragments) {
       if (text.includes(fragment)) failures.push(`${normalized}: forbidden fragment detected`);
+    }
+    for (const pattern of forbiddenPatterns) {
+      if (pattern.test(text)) failures.push(`${normalized}: forbidden fragment detected`);
     }
     if (windowsAbsolutePathPattern.test(text)) failures.push(`${normalized}: absolute Windows path detected`);
     if (emailPattern.test(text)) failures.push(`${normalized}: non-example email detected`);
