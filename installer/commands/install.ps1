@@ -8,7 +8,12 @@ param(
     [switch]$ConfirmInstall,
     [scriptblock]$CommandResolver,
     [scriptblock]$Runner,
-    [scriptblock]$ConfirmationReader
+    [scriptblock]$ConfirmationReader,
+    [scriptblock]$ExecutableResolver,
+    [scriptblock]$PathRefresher,
+    [Nullable[bool]]$PlatformIsWindows,
+    [version]$PowerShellVersion,
+    [Nullable[long]]$FreeBytes
 )
 
 Set-StrictMode -Version Latest
@@ -24,20 +29,30 @@ $resolver = if ($PSBoundParameters.ContainsKey('CommandResolver')) { $CommandRes
 $preflightArgs = @{ Lock = $lock }
 $planArgs = @{ Lock = $lock }
 if ($null -ne $resolver) { $preflightArgs.CommandResolver = $resolver; $planArgs.CommandResolver = $resolver }
+foreach ($name in @('PlatformIsWindows', 'PowerShellVersion', 'FreeBytes')) {
+    if ($PSBoundParameters.ContainsKey($name)) { $preflightArgs[$name] = $PSBoundParameters[$name] }
+}
 $preflight = Get-BootstrapPreflight @preflightArgs
 $plan = Resolve-PrerequisitePlan @planArgs
 
-$display = [pscustomobject]@{
+$display = [ordered]@{
     Project = $Project
     Resume = [bool]$Resume
-    Preflight = $preflight
-    Install = @($plan.Items | ForEach-Object { [pscustomobject]@{ Id = $_.id; Version = $_.version; Source = $_.source.kind } })
-    VersionMismatches = @($plan.VersionMismatches)
+    preflight = $preflight
+    plan = $plan
+    actions = @($plan.Items | ForEach-Object { "install:$($_.id)" })
 }
-Write-Host ($display | ConvertTo-Json -Depth 10)
+if (-not $Json) { Write-Host ($display | ConvertTo-Json -Depth 10) }
 
 $installArgs = @{ Plan = $plan; NonInteractive = $NonInteractive; ConfirmInstall = $ConfirmInstall }
 if ($PSBoundParameters.ContainsKey('Runner')) { $installArgs.Runner = $Runner }
 if ($PSBoundParameters.ContainsKey('ConfirmationReader')) { $installArgs.ConfirmationReader = $ConfirmationReader }
+if ($PSBoundParameters.ContainsKey('ExecutableResolver')) { $installArgs.ExecutableResolver = $ExecutableResolver }
+if ($PSBoundParameters.ContainsKey('PathRefresher')) { $installArgs.PathRefresher = $PathRefresher }
 $result = Invoke-ConfirmedPrerequisiteInstall @installArgs
-if ($Json) { $result | ConvertTo-Json -Depth 10 } else { $result }
+if ($Json) {
+    $display.state = $result.Status
+    $display.result = $result
+    Write-Output -NoEnumerate ($display | ConvertTo-Json -Depth 20)
+}
+else { $result }

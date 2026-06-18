@@ -38,6 +38,26 @@ Describe 'Get-BootstrapPreflight' {
     }
 }
 
+Describe 'ConvertFrom-VersionProbeResult' {
+    It 'parses successful semantic versions including common command aliases' {
+        (ConvertFrom-VersionProbeResult -Id node -Result ([pscustomobject]@{ ExitCode = 0; StdOut = 'v22.17.0'; StdErr = '' })).Version | Should -Be '22.17.0'
+        (ConvertFrom-VersionProbeResult -Id python -Result ([pscustomobject]@{ ExitCode = 0; StdOut = ''; StdErr = 'Python 3.13.5' })).Version | Should -Be '3.13.5'
+        (ConvertFrom-VersionProbeResult -Id git -Result ([pscustomobject]@{ ExitCode = 0; StdOut = 'git version 2.53.0.windows.1'; StdErr = '' })).Version | Should -Be '2.53.0'
+    }
+
+    It 'marks failed probes and non-semver output explicitly unusable' {
+        foreach ($result in @(
+            [pscustomobject]@{ ExitCode = 1; StdOut = '1.2.3'; StdErr = 'failed' },
+            [pscustomobject]@{ ExitCode = 0; StdOut = 'unknown'; StdErr = '' }
+        )) {
+            $state = ConvertFrom-VersionProbeResult -Id node -Result $result
+            $state.Present | Should -BeTrue
+            $state.Usable | Should -BeFalse
+            $state.Version | Should -BeNullOrEmpty
+        }
+    }
+}
+
 Describe 'Resolve-PrerequisitePlan' {
     It 'returns only missing prerequisites in dependency order' {
         $resolver = {
@@ -104,10 +124,40 @@ Describe 'Invoke-ConfirmedPrerequisiteInstall' {
     It 'installs Node before activating the locked pnpm through corepack' {
         $items = @($lock.components | Where-Object id -In @('node', 'pnpm'))
         $plan = [pscustomobject]@{ Items = $items; VersionMismatches = @() }
-        Invoke-ConfirmedPrerequisiteInstall -Plan $plan -Runner $script:runner -NonInteractive -ConfirmInstall | Out-Null
+        Invoke-ConfirmedPrerequisiteInstall -Plan $plan -Runner $script:runner -NonInteractive -ConfirmInstall -ExecutableResolver { 'corepack.cmd' } | Out-Null
         $script:runnerCalls[0].FilePath | Should -Be 'winget'
-        $script:runnerCalls[1].FilePath | Should -Be 'corepack'
+        $script:runnerCalls[1].FilePath | Should -Be 'corepack.cmd'
         $script:runnerCalls[1].Arguments | Should -Be @('prepare', 'pnpm@11.8.0', '--activate')
+    }
+
+    It 'refreshes command resolution after Node install and uses the resolved corepack path' {
+        $script:resolveCount = 0
+        $script:resolvedCorepack = Join-Path $TestDrive 'nodejs/corepack.cmd'
+        $resolver = {
+            param($name)
+            $script:resolveCount++
+            if ($script:resolveCount -eq 1) { return $null }
+            return $script:resolvedCorepack
+        }
+        $script:refreshCount = 0
+        $items = @($lock.components | Where-Object id -In @('node', 'pnpm'))
+        $plan = [pscustomobject]@{ Items = $items; VersionMismatches = @(); CompatibleIds = @() }
+
+        Invoke-ConfirmedPrerequisiteInstall -Plan $plan -Runner $script:runner -NonInteractive -ConfirmInstall -ExecutableResolver $resolver -PathRefresher { $script:refreshCount++ } | Out-Null
+
+        $script:resolveCount | Should -Be 2
+        $script:refreshCount | Should -Be 1
+        $script:runnerCalls[1].FilePath | Should -Be $script:resolvedCorepack
+    }
+
+    It 'requires resume instead of attempting pnpm when corepack remains unavailable after refresh' {
+        $items = @($lock.components | Where-Object id -In @('node', 'pnpm'))
+        $plan = [pscustomobject]@{ Items = $items; VersionMismatches = @(); CompatibleIds = @() }
+
+        { Invoke-ConfirmedPrerequisiteInstall -Plan $plan -Runner $script:runner -NonInteractive -ConfirmInstall -ExecutableResolver { $null } -PathRefresher { } } | Should -Throw 'PREREQUISITE_RESTART_REQUIRED:node*'
+
+        $script:runnerCalls.Count | Should -Be 1
+        $script:runnerCalls[0].FilePath | Should -Be 'winget'
     }
 }
 
@@ -116,5 +166,21 @@ Describe 'install command contract' {
         $commandPath = Join-Path $repoRoot 'installer/commands/install.ps1'
         $text = Get-Content -LiteralPath $commandPath -Raw
         foreach ($name in @('Root', 'Project', 'Resume', 'NonInteractive', 'Json', 'ConfirmInstall')) { $text | Should -Match ([regex]::Escape('$' + $name)) }
+    }
+
+    It 'emits exactly one parseable JSON document with the complete state and no information records' {
+        $commandPath = Join-Path $repoRoot 'installer/commands/install.ps1'
+        $resolver = { param($id) [pscustomobject]@{ Present = $false; Usable = $false; Version = $null } }
+        $runner = { param($FilePath, $Arguments) [pscustomobject]@{ ExitCode = 0; StdOut = ''; StdErr = '' } }
+
+        $output = @(& $commandPath -Root $repoRoot -Json -NonInteractive -ConfirmInstall -PlatformIsWindows $true -PowerShellVersion ([version]'7.5') -FreeBytes 2GB -CommandResolver $resolver -Runner $runner -ExecutableResolver { 'corepack.cmd' } -PathRefresher { } 6>&1)
+
+        $output.Count | Should -Be 1
+        $document = $output[0] | ConvertFrom-Json -Depth 20
+        $document.preflight.Platform | Should -Be 'windows-powershell'
+        @($document.plan.Items).Count | Should -Be 5
+        @($document.actions).Count | Should -Be 5
+        $document.state | Should -Be 'COMPLETED'
+        $document.result.Status | Should -Be 'COMPLETED'
     }
 }

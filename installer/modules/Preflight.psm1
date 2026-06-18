@@ -4,25 +4,75 @@ $ErrorActionPreference = 'Stop'
 $runnerModule = Join-Path $PSScriptRoot 'ProcessRunner.psm1'
 Import-Module $runnerModule -Force
 
+function ConvertFrom-VersionProbeResult {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Id,
+        [Parameter(Mandatory)][object]$Result
+    )
+
+    if ($Result.ExitCode -ne 0) {
+        return [pscustomobject]@{ Present = $true; Usable = $false; Version = $null; Id = $Id }
+    }
+    $text = "$($Result.StdOut) $($Result.StdErr)"
+    $match = [regex]::Match($text, '(?<!\d)(\d+\.\d+\.\d+)(?:-[0-9A-Za-z.-]+)?')
+    if (-not $match.Success) {
+        return [pscustomobject]@{ Present = $true; Usable = $false; Version = $null; Id = $Id }
+    }
+    [pscustomobject]@{ Present = $true; Usable = $true; Version = $match.Groups[1].Value; Id = $Id }
+}
+
+function Test-CommandStateUsable {
+    param([object]$State)
+    if (-not $State.Present) { return $false }
+    $usableProperty = $State.PSObject.Properties['Usable']
+    return $null -eq $usableProperty -or [bool]$usableProperty.Value
+}
+
 function Get-DefaultCommandState {
     param([Parameter(Mandatory)][string]$Id)
 
     $commandName = if ($Id -eq 'python') { 'python' } else { $Id }
     $command = Get-Command -Name $commandName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($null -eq $command) {
-        return [pscustomobject]@{ Present = $false; Version = $null }
+        return [pscustomobject]@{ Present = $false; Usable = $false; Version = $null }
     }
     if ($Id -eq 'winget') {
-        return [pscustomobject]@{ Present = $true; Version = $null }
+        return [pscustomobject]@{ Present = $true; Usable = $true; Version = $null }
     }
 
     $result = Invoke-SafeProcess -FilePath $command.Source -Arguments @('--version')
-    $text = "$($result.StdOut) $($result.StdErr)"
-    $match = [regex]::Match($text, '\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?')
-    [pscustomobject]@{
-        Present = $true
-        Version = if ($match.Success) { $match.Value } else { $null }
+    ConvertFrom-VersionProbeResult -Id $Id -Result $result
+}
+
+function Update-BootstrapProcessPath {
+    $segments = [Collections.Generic.List[string]]::new()
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($scope in @('Machine', 'User')) {
+        $value = [Environment]::GetEnvironmentVariable('Path', $scope)
+        foreach ($segment in @($value -split ';')) {
+            if (-not [string]::IsNullOrWhiteSpace($segment) -and $seen.Add($segment)) { [void]$segments.Add($segment) }
+        }
     }
+    foreach ($segment in @($env:Path -split ';')) {
+        if (-not [string]::IsNullOrWhiteSpace($segment) -and $seen.Add($segment)) { [void]$segments.Add($segment) }
+    }
+    $env:Path = $segments -join ';'
+}
+
+function Resolve-BootstrapExecutable {
+    param([Parameter(Mandatory)][string]$Name)
+    $command = Get-Command -Name $Name -CommandType Application, ExternalScript -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -ne $command) { return $command.Source }
+    if ($Name -eq 'corepack') {
+        foreach ($candidate in @(
+            (Join-Path $env:ProgramFiles 'nodejs\corepack.cmd'),
+            (if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} 'nodejs\corepack.cmd' })
+        )) {
+            if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) { return $candidate }
+        }
+    }
+    return $null
 }
 
 function Get-BootstrapPreflight {
@@ -54,8 +104,9 @@ function Get-BootstrapPreflight {
     $checks = foreach ($id in $ids) {
         $state = & $CommandResolver $id
         $requiredVersion = if ($components.ContainsKey($id)) { [string]$components[$id].version } else { $null }
-        $status = if (-not $state.Present) { 'Missing' } elseif ($null -ne $requiredVersion -and $state.Version -ne $requiredVersion) { 'VersionMismatch' } else { 'Compatible' }
-        [pscustomobject]@{ Id = $id; Present = [bool]$state.Present; Version = $state.Version; RequiredVersion = $requiredVersion; Status = $status }
+        $usable = Test-CommandStateUsable -State $state
+        $status = if (-not $state.Present) { 'Missing' } elseif (-not $usable) { 'Unusable' } elseif ($null -ne $requiredVersion -and $state.Version -ne $requiredVersion) { 'VersionMismatch' } else { 'Compatible' }
+        [pscustomobject]@{ Id = $id; Present = [bool]$state.Present; Usable = $usable; Version = $state.Version; RequiredVersion = $requiredVersion; Status = $status }
     }
 
     [pscustomobject]@{
@@ -63,7 +114,7 @@ function Get-BootstrapPreflight {
         RequiredBytes = $RequiredBytes
         FreeBytes = $available
         Checks = @($checks)
-        Actions = @($checks | Where-Object Status -EQ 'Missing' | ForEach-Object { "install:$($_.Id)" })
+        Actions = @($checks | Where-Object { $_.Status -in @('Missing', 'Unusable') } | ForEach-Object { "install:$($_.Id)" })
     }
 }
 
@@ -84,7 +135,7 @@ function Resolve-PrerequisitePlan {
     foreach ($id in $prerequisiteIds) {
         $component = $componentMap[$id]
         $state = & $CommandResolver $id
-        if (-not $state.Present) {
+        if (-not (Test-CommandStateUsable -State $state)) {
             [void]$items.Add($component)
         }
         elseif ([string]$state.Version -eq [string]$component.version) {
@@ -109,6 +160,8 @@ function Invoke-ConfirmedPrerequisiteInstall {
         [Parameter(Mandatory)][object]$Plan,
         [scriptblock]$Runner = { param($FilePath, $Arguments) Invoke-SafeProcess -FilePath $FilePath -Arguments $Arguments },
         [scriptblock]$ConfirmationReader = { Read-Host 'Type INSTALL to continue' },
+        [scriptblock]$ExecutableResolver = { param($name) Resolve-BootstrapExecutable -Name $name },
+        [scriptblock]$PathRefresher = { Update-BootstrapProcessPath },
         [switch]$NonInteractive,
         [switch]$ConfirmInstall
     )
@@ -126,12 +179,20 @@ function Invoke-ConfirmedPrerequisiteInstall {
         foreach ($id in @($Plan.CompatibleIds)) { [void]$verified.Add([string]$id) }
     }
     $installed = [Collections.Generic.List[string]]::new()
+    $needsPnpm = @($Plan.Items | Where-Object id -EQ 'pnpm').Count -gt 0
+    $corepackPath = if ($needsPnpm) { & $ExecutableResolver 'corepack' } else { $null }
+    $nodeInstalled = $false
     foreach ($component in @($Plan.Items)) {
         $id = [string]$component.id
         if (-not $component.install.allowed) { throw "PREREQUISITE_INSTALL_FAILED:$id`: installation is not allowed." }
         if ($id -eq 'pnpm') {
             if (-not $verified.Contains('node')) { throw 'PREREQUISITE_INSTALL_FAILED:pnpm: Node is not verified.' }
-            $filePath = 'corepack'
+            if (-not $corepackPath -and $nodeInstalled) {
+                & $PathRefresher
+                $corepackPath = & $ExecutableResolver 'corepack'
+            }
+            if (-not $corepackPath) { throw 'PREREQUISITE_RESTART_REQUIRED:node: corepack is unavailable in the current process; resume after restarting PowerShell.' }
+            $filePath = $corepackPath
             $arguments = @('prepare', "pnpm@$($component.version)", '--activate')
         }
         elseif ($component.source.kind -eq 'winget') {
@@ -148,9 +209,10 @@ function Invoke-ConfirmedPrerequisiteInstall {
         if ($null -eq $result -or $result.ExitCode -ne 0) { throw "PREREQUISITE_INSTALL_FAILED:$id`: process exited unsuccessfully." }
         [void]$verified.Add($id)
         [void]$installed.Add($id)
+        if ($id -eq 'node') { $nodeInstalled = $true }
     }
 
     [pscustomobject]@{ Status = 'COMPLETED'; Installed = @($installed) }
 }
 
-Export-ModuleMember -Function Get-BootstrapPreflight, Resolve-PrerequisitePlan, Invoke-ConfirmedPrerequisiteInstall
+Export-ModuleMember -Function ConvertFrom-VersionProbeResult, Get-BootstrapPreflight, Resolve-PrerequisitePlan, Invoke-ConfirmedPrerequisiteInstall
