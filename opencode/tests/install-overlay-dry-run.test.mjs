@@ -18,7 +18,7 @@ test("opencode overlay dry-run writes nothing to target", async () => {
   const target = await mkdtemp(path.join(os.tmpdir(), "opencode-overlay-dry-run-"));
   const result = spawnSync(
     process.execPath,
-    ["scripts/install-opencode-overlay.mjs", "--dry-run", "--target", target],
+    ["opencode/scripts/install-overlay.mjs", "--dry-run", "--target", target],
     { cwd: repoRoot, encoding: "utf8" }
   );
   const entries = await readdir(target);
@@ -32,7 +32,7 @@ test("opencode overlay rejects update-managed application directories", () => {
   const appDir = path.join("Users", "example", "AppData", "Local", "Programs", "OpenCode");
   const result = spawnSync(
     process.execPath,
-    ["scripts/install-opencode-overlay.mjs", "--dry-run", "--target", appDir],
+    ["opencode/scripts/install-overlay.mjs", "--dry-run", "--target", appDir],
     { cwd: repoRoot, encoding: "utf8" }
   );
 
@@ -42,7 +42,7 @@ test("opencode overlay rejects update-managed application directories", () => {
 
 test("opencode overlay refuses real install until the Codex phase is stable", async () => {
   const target = await mkdtemp(path.join(os.tmpdir(), "opencode-overlay-real-"));
-  const result = spawnSync(process.execPath, ["scripts/install-opencode-overlay.mjs", "--target", target], {
+  const result = spawnSync(process.execPath, ["opencode/scripts/install-overlay.mjs", "--target", target], {
     cwd: repoRoot,
     encoding: "utf8"
   });
