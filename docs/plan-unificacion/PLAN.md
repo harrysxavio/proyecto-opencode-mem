@@ -442,10 +442,12 @@ proyecto-opencode-mem/               ← Runtime Kit
 
 | Fase | Estado | Inicio | Fin |
 |------|--------|--------|-----|
-| 0 | 🔄 En ejecución | 2026-06-18 | — |
-| 1 | 🔜 Pendiente | — | — |
-| 2 | 🔜 Pendiente | — | — |
-| 3 | 🔜 Pendiente | — | — |
-| 4 | 🔜 Pendiente | — | — |
-| 5 | 🔜 Pendiente | — | — |
-| 6 | 🔜 Pendiente | — | — |
+| 0 — Merge y Restructura Base | ✅ Completada | 2026-06-18 | 2026-06-18 |
+| 1 — Contratos Portables | ✅ Completada | 2026-06-18 | 2026-06-18 |
+| 2 — Adaptador OpenCode | ✅ Completada | 2026-06-18 | 2026-06-18 |
+| 3 — Adaptador Codex | ✅ Completada | 2026-06-18 | 2026-06-18 |
+| 4 — README Unificado y Quickstarts | ✅ Completada | 2026-06-18 | 2026-06-18 |
+| 5 — Tests y CI | ✅ Completada | 2026-06-18 | 2026-06-18 |
+| 6 — Limpieza Final y Release | ✅ Completada | 2026-06-18 | 2026-06-18 |
+
+**Resumen**: Las 7 fases del plan están completadas. La arquitectura dual-runtime (OpenCode + Codex) está unificada con contratos portables en `contracts/`, adaptadores runtime-specific en `opencode/` y `codex/`, skills portables compartidas, 96 tests pasando, validaciones PASS. Pendiente: tag v0.2.0 y CHANGELOG.
