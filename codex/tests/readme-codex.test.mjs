@@ -5,8 +5,13 @@ import { readFile } from "node:fs/promises";
 const readme = await readFile("README_CODEX.md", "utf8");
 const mainReadme = await readFile("README.md", "utf8");
 
-test("README.md mirrors README_CODEX.md as the primary project README", () => {
-  assert.equal(mainReadme, readme);
+test("README.md references the unified architecture and runtime quickstarts", () => {
+  assert.match(mainReadme, /Runtime Kit/i);
+  assert.match(mainReadme, /OpenCode/);
+  assert.match(mainReadme, /Codex/);
+  assert.match(mainReadme, /contracts\//);
+  assert.match(mainReadme, /QUICKSTART_OPENCODE/);
+  assert.match(mainReadme, /QUICKSTART_CODEX/);
 });
 
 test("README_CODEX explains the architecture in Spanish for non-technical readers first", () => {
