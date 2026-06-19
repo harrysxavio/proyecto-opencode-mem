@@ -115,7 +115,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 ### 2026-06-18 — Task 5
 
 - Status: `completed`.
-- Commits: inicio `e29b5ca`; implementación `24d4ab0`.
+- Commits: inicio `e29b5ca`; implementación `24d4ab0`; remediación Spec `8193dc7`.
 - Tests:
   - TDD RED inicial: `0/13` passed; `13/13` fallaron por módulo y funciones ausentes.
   - TDD GREEN base: `13/13`.
@@ -123,13 +123,15 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
   - Quality RED semántica/forma: `15/17` passed; fallaron equivalencia numérica y tipos raíz inválidos.
   - Quality RED claves no string: `16/17` passed.
   - TDD GREEN focalizado final: `17/17`.
-  - `pnpm test:powershell`: `95/95`.
+  - Spec remediation RED: `15/20` passed; fallaron validación recursiva de arrays y atomicidad del receipt.
+  - Spec remediation GREEN: `20/20` con receipt validado/clonado y arrays validados recursivamente.
+  - `pnpm test:powershell`: `98/98`.
   - `pnpm test:all`: `109/109`.
   - `pnpm docs:check`: `PASS`.
   - `git diff --check`: `PASS`.
 - Reviews:
   - Self-review: `APPROVED`.
-  - Spec: `PENDING`.
+  - Spec: `PENDING RE-REVIEW` tras remediar validación transaccional del receipt y shapes recursivos de arrays.
   - Quality: `PENDING`.
 
 ## Decisiones
