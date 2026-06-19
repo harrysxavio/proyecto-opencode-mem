@@ -195,6 +195,36 @@ Describe 'Write-OpenCodeConfig' {
         Test-Path $absentBackup | Should -BeFalse
     }
 
+    It 'prevalidates backup id before creating an absent root or synchronization primitive' {
+        $absentRoot = Join-Path $TestDrive ('bad-id-root-' + [guid]::NewGuid().ToString('N'))
+        $nestedPath = Join-Path $absentRoot 'nested/opencode.jsonc'
+        $absentBackup = Join-Path $TestDrive ('bad-id-backup-' + [guid]::NewGuid().ToString('N'))
+        { Write-OpenCodeConfig $nestedPath $absentRoot (New-EngramOwned) (New-TestReceipt) $absentBackup '../bad-id' } |
+            Should -Throw 'BACKUP_ID_INVALID*'
+        Test-Path $absentRoot | Should -BeFalse
+        Test-Path $nestedPath | Should -BeFalse
+        Test-Path $absentBackup | Should -BeFalse
+    }
+
+    It 'rejects a junction injected at a missing descendant without mutating its target' {
+        $absentRoot = Join-Path $TestDrive ('segment-root-' + [guid]::NewGuid().ToString('N'))
+        $nestedPath = Join-Path $absentRoot 'nested/opencode.jsonc'
+        $outsideRoot = Join-Path $TestDrive ('segment-outside-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $outsideRoot -Force | Out-Null
+        $state = [pscustomobject]@{ done = $false }
+        $inject = {
+            param($NextPath)
+            if (-not $state.done) {
+                New-Item -ItemType Junction -Path $NextPath -Target $outsideRoot | Out-Null
+                $state.done = $true
+            }
+        }
+        { Write-OpenCodeConfig $nestedPath $absentRoot (New-EngramOwned) (New-TestReceipt) $backupRoot $backupId -BeforeDescendantCreation $inject } |
+            Should -Throw 'CONFIG_*'
+        @(Get-ChildItem -LiteralPath $outsideRoot -Force).Count | Should -Be 0
+        Test-Path (Join-Path $outsideRoot 'opencode.jsonc') | Should -BeFalse
+    }
+
     It 'does not back up or write on collision and leaves the original unchanged' {
         $original = '{"mcp":{"engram":{"enabled":false}}}'
         [IO.File]::WriteAllText($path, $original)
@@ -252,6 +282,25 @@ Describe 'Write-OpenCodeConfig' {
         [IO.File]::ReadAllText($path) | Should -Be $concurrent
         $receipt.backups.Count | Should -Be 0
         Test-Path $backupRoot | Should -BeFalse
+    }
+
+    It 'uses compare-and-swap publication to preserve content written immediately before replace' {
+        $original = '{"mcp":{}}'; $concurrent = '{"mcp":{"lastWriter":true}}'
+        [IO.File]::WriteAllText($path, $original)
+        $operation = { [IO.File]::WriteAllText($path, $concurrent) }
+        { Write-OpenCodeConfig $path $root (New-EngramOwned) $receipt $backupRoot $backupId -BeforeAtomicPublish $operation } |
+            Should -Throw 'CONFIG_CONCURRENT_MODIFICATION*'
+        [IO.File]::ReadAllText($path) | Should -Be $concurrent
+        @(Get-ChildItem $root -Filter '*.swap-backup' -Force).Count | Should -Be 0
+    }
+
+    It 'restores the original atomically when publication fails after replace' {
+        $original = '{"mcp":{}}'; [IO.File]::WriteAllText($path, $original)
+        $failure = { throw 'simulated post-replace failure' }
+        { Write-OpenCodeConfig $path $root (New-EngramOwned) $receipt $backupRoot $backupId -AfterAtomicPublishValidation $failure } |
+            Should -Throw 'simulated post-replace failure'
+        [IO.File]::ReadAllText($path) | Should -Be $original
+        @(Get-ChildItem $root -Filter '*.swap-backup' -Force).Count | Should -Be 0
     }
 
     It 'fails closed when a concurrent operation attempts to replace the locked config root' {

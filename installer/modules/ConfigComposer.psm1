@@ -17,9 +17,24 @@ namespace CodexKit.Config {
     }
 
     public static class NativeDirectoryLock {
+        [StructLayout(LayoutKind.Sequential)]
+        public struct FileInformation {
+            public uint Attributes;
+            public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
+            public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
+            public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
+            public uint VolumeSerialNumber;
+            public uint FileSizeHigh;
+            public uint FileSizeLow;
+            public uint Links;
+            public uint FileIndexHigh;
+            public uint FileIndexLow;
+        }
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern SafeFileHandle CreateFileW(
             string name, uint access, uint share, IntPtr security, uint creation, uint flags, IntPtr template);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool GetFileInformationByHandle(SafeFileHandle handle, out FileInformation information);
     }
 }
 '@
@@ -402,15 +417,17 @@ function Get-NearestExistingConfigDirectory {
 }
 
 function Enter-ConfigDirectoryLocks {
-    param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$Parent)
+    param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$Parent, [switch]$OpenReparsePoint)
     if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { throw 'CONFIG_DIRECTORY_LOCK_UNAVAILABLE:platform' }
     $result = [Collections.Generic.List[object]]::new()
     try {
         foreach ($path in @($Root, $Parent) | Select-Object -Unique) {
             if (-not (Test-Path -LiteralPath $path -PathType Container)) { throw "CONFIG_DIRECTORY_LOCK_UNAVAILABLE:$path" }
             $identity = (Resolve-Path -LiteralPath $path).Path
+            $flags = 0x02000000
+            if ($OpenReparsePoint) { $flags = $flags -bor 0x00200000 }
             $handle = [CodexKit.Config.NativeDirectoryLock]::CreateFileW(
-                $identity, 0, 3, [IntPtr]::Zero, 3, 0x02000000, [IntPtr]::Zero)
+                $identity, 0, 3, [IntPtr]::Zero, 3, $flags, [IntPtr]::Zero)
             if ($null -eq $handle -or $handle.IsInvalid) {
                 if ($null -ne $handle) { $handle.Dispose() }
                 throw "CONFIG_DIRECTORY_LOCK_UNAVAILABLE:${path}:$([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
@@ -423,6 +440,44 @@ function Enter-ConfigDirectoryLocks {
         foreach ($entry in $result) { $entry.Handle.Dispose() }
         throw
     }
+}
+
+function New-SafeConfigDirectoryPath {
+    param(
+        [Parameter(Mandatory)][string]$Anchor,
+        [Parameter(Mandatory)][string]$Target,
+        [scriptblock]$BeforeDescendantCreation
+    )
+    $relative = [IO.Path]::GetRelativePath($Anchor, $Target)
+    if ($relative -eq '.' ) { return ,@() }
+    if ($relative -eq '..' -or $relative.StartsWith('..' + [IO.Path]::DirectorySeparatorChar)) { throw 'CONFIG_PATH_OUTSIDE_ROOT:descendant' }
+    $held = [Collections.Generic.List[object]]::new()
+    $current = [IO.Path]::GetFullPath($Anchor)
+    try {
+        foreach ($segment in $relative.Split([IO.Path]::DirectorySeparatorChar, [StringSplitOptions]::RemoveEmptyEntries)) {
+            $next = Join-Path $current $segment
+            if ($null -ne $BeforeDescendantCreation) { & $BeforeDescendantCreation $next }
+            if (-not (Test-Path -LiteralPath $next)) { [void][IO.Directory]::CreateDirectory($next) }
+            if (-not (Test-Path -LiteralPath $next -PathType Container)) { throw "CONFIG_PATH_OUTSIDE_ROOT:$next" }
+            $item = Get-Item -LiteralPath $next -Force
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "CONFIG_PATH_OUTSIDE_ROOT:$next" }
+            foreach ($entry in (Enter-ConfigDirectoryLocks -Root $next -Parent $next -OpenReparsePoint)) { $held.Add($entry) }
+            $current = $next
+        }
+        return ,$held.ToArray()
+    }
+    catch {
+        foreach ($entry in $held) { $entry.Handle.Dispose() }
+        throw
+    }
+}
+
+function Restore-ConfigSwapBackup {
+    param([Parameter(Mandatory)][string]$SwapBackup, [Parameter(Mandatory)][string]$Destination)
+    $discard = $Destination + '.' + [guid]::NewGuid().ToString('N') + '.restore-discard'
+    try { [IO.File]::Replace($SwapBackup, $Destination, $discard, $true) }
+    catch { throw "CONFIG_ATOMIC_RESTORE_FAILED:$($_.Exception.Message)" }
+    finally { if (Test-Path -LiteralPath $discard) { Remove-Item -LiteralPath $discard -Force } }
 }
 
 function Assert-ConfigDirectoryLocksCurrent {
@@ -444,13 +499,27 @@ function Test-ConfigBytesEqual {
     return $true
 }
 
+function Get-ConfigFileIdentity {
+    param([Parameter(Mandatory)][string]$Path)
+    $stream = [IO.FileStream]::new($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+    try {
+        $information = [CodexKit.Config.NativeDirectoryLock+FileInformation]::new()
+        if (-not [CodexKit.Config.NativeDirectoryLock]::GetFileInformationByHandle($stream.SafeFileHandle, [ref]$information)) {
+            throw "CONFIG_FILE_IDENTITY_UNAVAILABLE:$([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+        }
+        return '{0:x8}:{1:x8}:{2:x8}' -f $information.VolumeSerialNumber, $information.FileIndexHigh, $information.FileIndexLow
+    }
+    finally { $stream.Dispose() }
+}
+
 function Assert-ConfigFileUnchanged {
-    param([Parameter(Mandatory)][string]$Path, [AllowNull()][byte[]]$OriginalBytes)
+    param([Parameter(Mandatory)][string]$Path, [AllowNull()][byte[]]$OriginalBytes, [AllowNull()][string]$OriginalIdentity)
     $exists = Test-Path -LiteralPath $Path -PathType Leaf
     if (($null -eq $OriginalBytes) -ne (-not $exists)) { throw 'CONFIG_CONCURRENT_MODIFICATION:existence changed' }
     if ($exists) {
         $current = [IO.File]::ReadAllBytes($Path)
         if (-not (Test-ConfigBytesEqual $OriginalBytes $current)) { throw 'CONFIG_CONCURRENT_MODIFICATION:content changed' }
+        if ((Get-ConfigFileIdentity $Path) -cne $OriginalIdentity) { throw 'CONFIG_CONCURRENT_MODIFICATION:identity changed' }
     }
 }
 
@@ -459,12 +528,13 @@ function Assert-ConfigStateUnchanged {
         [Parameter(Mandatory)][string]$Path,
         [Parameter(Mandatory)][string]$Root,
         [Parameter(Mandatory)][object[]]$Locks,
-        [AllowNull()][byte[]]$OriginalBytes
+        [AllowNull()][byte[]]$OriginalBytes,
+        [AllowNull()][string]$OriginalIdentity
     )
     try {
         [void](Assert-ConfigPath -Path $Path -Root $Root)
         Assert-ConfigDirectoryLocksCurrent $Locks
-        Assert-ConfigFileUnchanged -Path $Path -OriginalBytes $OriginalBytes
+        Assert-ConfigFileUnchanged -Path $Path -OriginalBytes $OriginalBytes -OriginalIdentity $OriginalIdentity
     }
     catch {
         if ($_.Exception.Message -like 'CONFIG_CONCURRENT_MODIFICATION:*') { throw }
@@ -483,13 +553,17 @@ function Write-OpenCodeConfig {
         [Parameter(Mandatory,Position=5)][string]$BackupId,
         [scriptblock]$BackupCopyOperation,
         [scriptblock]$AtomicWriteOperation,
-        [Alias('BeforePublishOperation','PrePublishOperation')][scriptblock]$BeforePublishValidation
+        [Alias('BeforePublishOperation','PrePublishOperation')][scriptblock]$BeforePublishValidation,
+        [scriptblock]$BeforeDescendantCreation,
+        [Alias('ImmediatelyBeforePublish')][scriptblock]$BeforeAtomicPublish,
+        [Alias('AfterAtomicPublish')][scriptblock]$AfterAtomicPublishValidation
     )
     $fullPath = Assert-ConfigPath -Path $ConfigPath -Root $OpenCodeConfigRoot
     $parent = [IO.Path]::GetDirectoryName($fullPath)
     $exists = Test-Path -LiteralPath $fullPath -PathType Leaf
     if ((Test-Path -LiteralPath $fullPath) -and -not $exists) { throw "CONFIG_PATH_OUTSIDE_ROOT:$ConfigPath" }
     $originalBytes = if ($exists) { [IO.File]::ReadAllBytes($fullPath) } else { $null }
+    $originalIdentity = if ($exists) { Get-ConfigFileIdentity $fullPath } else { $null }
     $existingText = if ($exists) { [IO.File]::ReadAllText($fullPath, [Text.Encoding]::UTF8) } else { '{}' }
     $merge = Merge-OpenCodeConfig -ExistingText $existingText -Owned $Owned
     $receiptCopy = Copy-ValidatedInstallReceipt $Receipt
@@ -497,6 +571,7 @@ function Write-OpenCodeConfig {
     foreach ($key in $merge.OwnedKeys) { Add-ReceiptOwnedKey -Receipt $receiptCopy -Key $key }
     [void](Assert-InstallReceipt $receiptCopy)
     if (-not $merge.Changed) { return Add-ReceiptToMergeResult -Merge $merge -Receipt $receiptCopy }
+    [void](Assert-SafeBackupId $BackupId)
 
     $anchor = Get-NearestExistingConfigDirectory $OpenCodeConfigRoot
     $mutex = [Threading.Mutex]::new($false, (Get-ConfigMutexName $fullPath))
@@ -507,37 +582,77 @@ function Write-OpenCodeConfig {
         if (-not $mutexAcquired) { throw 'CONFIG_LOCK_TIMEOUT' }
         $anchorLocks = Enter-ConfigDirectoryLocks -Root $anchor -Parent $anchor
         try {
-            Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $anchorLocks -OriginalBytes $originalBytes
-            New-Item -ItemType Directory -Path $parent -Force | Out-Null
-            Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $anchorLocks -OriginalBytes $originalBytes
-            $locks = Enter-ConfigDirectoryLocks -Root ([IO.Path]::GetFullPath($OpenCodeConfigRoot)) -Parent $parent
+            Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $anchorLocks -OriginalBytes $originalBytes -OriginalIdentity $originalIdentity
+            $segmentLocks = New-SafeConfigDirectoryPath -Anchor $anchor -Target $parent -BeforeDescendantCreation $BeforeDescendantCreation
+            $locks = @($anchorLocks) + @($segmentLocks)
             try {
-                Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes
+                Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes -OriginalIdentity $originalIdentity
 
                 if ($PSBoundParameters.ContainsKey('BeforePublishValidation')) {
                     try { & $BeforePublishValidation }
                     catch { throw "CONFIG_CONCURRENT_MODIFICATION:$($_.Exception.Message)" }
                 }
-                Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes
+                Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes -OriginalIdentity $originalIdentity
 
                 $backupParameters = @{ Receipt = $receiptCopy; Path = $fullPath; BackupRoot = $BackupRoot; BackupId = $BackupId; AllowedRoots = @($OpenCodeConfigRoot) }
                 if ($PSBoundParameters.ContainsKey('BackupCopyOperation')) { $backupParameters.CopyOperation = $BackupCopyOperation }
                 [void](Backup-InstallPath @backupParameters)
                 [void](Assert-InstallReceipt $receiptCopy)
-                Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes
+                Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes -OriginalIdentity $originalIdentity
 
                 $temp = Join-Path $parent ('.' + [IO.Path]::GetFileName($fullPath) + '.' + [guid]::NewGuid().ToString('N') + '.tmp')
                 try {
-                    if ($PSBoundParameters.ContainsKey('AtomicWriteOperation')) { & $AtomicWriteOperation $temp $fullPath $merge.Json }
-                    else { [IO.File]::WriteAllText($temp, $merge.Json, [Text.UTF8Encoding]::new($false)) }
-                    Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes
+                    if ($PSBoundParameters.ContainsKey('AtomicWriteOperation')) {
+                        & $AtomicWriteOperation $temp $fullPath $merge.Json
+                        if (Test-Path -LiteralPath $temp -PathType Leaf) {
+                            $flushStream = [IO.FileStream]::new($temp, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+                            try { $flushStream.Flush($true) } finally { $flushStream.Dispose() }
+                        }
+                    }
+                    else {
+                        $payload = [Text.UTF8Encoding]::new($false).GetBytes($merge.Json)
+                        $stream = [IO.FileStream]::new($temp, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None, 4096, [IO.FileOptions]::WriteThrough)
+                        try { $stream.Write($payload, 0, $payload.Length); $stream.Flush($true) }
+                        finally { $stream.Dispose() }
+                    }
+                    Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes -OriginalIdentity $originalIdentity
                     if (-not (Test-Path -LiteralPath $temp -PathType Leaf)) { throw 'CONFIG_ATOMIC_TEMP_MISSING' }
-                    [IO.File]::Move($temp, $fullPath, $true)
+                    if ($PSBoundParameters.ContainsKey('BeforeAtomicPublish')) { & $BeforeAtomicPublish }
+                    if ($null -eq $originalBytes) {
+                        try { [IO.File]::Move($temp, $fullPath, $false) }
+                        catch [IO.IOException] { throw "CONFIG_CONCURRENT_MODIFICATION:$($_.Exception.Message)" }
+                    }
+                    else {
+                        $swapBackup = $fullPath + '.' + [guid]::NewGuid().ToString('N') + '.swap-backup'
+                        $replaced = $false
+                        try {
+                            try { [IO.File]::Replace($temp, $fullPath, $swapBackup, $true); $replaced = $true }
+                            catch [PlatformNotSupportedException] { throw "CONFIG_ATOMIC_REPLACE_UNAVAILABLE:$($_.Exception.Message)" }
+                            if ($PSBoundParameters.ContainsKey('AfterAtomicPublishValidation')) { & $AfterAtomicPublishValidation }
+                            $actualReplaced = [IO.File]::ReadAllBytes($swapBackup)
+                            $actualIdentity = Get-ConfigFileIdentity $swapBackup
+                            if (-not (Test-ConfigBytesEqual $originalBytes $actualReplaced) -or $actualIdentity -cne $originalIdentity) {
+                                Restore-ConfigSwapBackup -SwapBackup $swapBackup -Destination $fullPath
+                                $replaced = $false
+                                throw 'CONFIG_CONCURRENT_MODIFICATION:compare-and-swap mismatch'
+                            }
+                            Remove-Item -LiteralPath $swapBackup -Force
+                            $replaced = $false
+                        }
+                        catch {
+                            if ($replaced -and (Test-Path -LiteralPath $swapBackup)) {
+                                Restore-ConfigSwapBackup -SwapBackup $swapBackup -Destination $fullPath
+                                $replaced = $false
+                            }
+                            throw
+                        }
+                        finally { if (Test-Path -LiteralPath $swapBackup) { Remove-Item -LiteralPath $swapBackup -Force } }
+                    }
                 }
                 finally { if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Force } }
                 return Add-ReceiptToMergeResult -Merge $merge -Receipt $receiptCopy
             }
-            finally { foreach ($entry in $locks) { $entry.Handle.Dispose() } }
+            finally { foreach ($entry in $segmentLocks) { $entry.Handle.Dispose() } }
         }
         finally { foreach ($entry in $anchorLocks) { $entry.Handle.Dispose() } }
     }
