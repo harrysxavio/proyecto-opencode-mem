@@ -26,7 +26,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 | Task 4 | [Add receipts, backups, checkpoints, resume and safe rollback](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-4-add-receipts-backups-checkpoints-resume-and-safe-rollback) | `completed` |
 | Task 5 | [Compose OpenCode JSON/JSONC without overwriting user entries](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-5-compose-opencode-jsonjsonc-without-overwriting-user-entries) | `completed` |
 | Task 6 | [Implement dependency execution and the verification registry](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-6-implement-dependency-execution-and-the-verification-registry) | `completed` |
-| Task 7 | [Install the pinned OpenCode, Engram and Graphify core](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-7-install-the-pinned-opencode-engram-and-graphify-core) | `pending` |
+| Task 7 | [Install the pinned OpenCode, Engram and Graphify core](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-7-install-the-pinned-opencode-engram-and-graphify-core) | `in_progress` |
 | Task 8 | [Configure and probe credential-free MCP servers](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-8-configure-and-probe-credential-free-mcp-servers) | `pending` |
 | Task 9 | [Install canonical Manager, ten SDD subagents, skills and audited plugins](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-9-install-canonical-manager-ten-sdd-subagents-skills-and-audited-plugins) | `pending` |
 | Task 10 | [Add optional authenticated integrations and secure continuation](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-10-add-optional-authenticated-integrations-and-secure-continuation) | `pending` |
@@ -38,8 +38,8 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 
 ## Estado actual
 
-- Tarea activa: ninguna.
-- Siguiente tarea: [Task 7 — Install the pinned OpenCode, Engram and Graphify core](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-7-install-the-pinned-opencode-engram-and-graphify-core) (`pending`).
+- Tarea activa: [Task 7 — Install the pinned OpenCode, Engram and Graphify core](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-7-install-the-pinned-opencode-engram-and-graphify-core) (`in_progress`).
+- Siguiente tarea: [Task 8 — Configure and probe credential-free MCP servers](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-8-configure-and-probe-credential-free-mcp-servers) (`pending`).
 
 ## Checkpoints
 
