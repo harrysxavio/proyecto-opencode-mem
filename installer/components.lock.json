@@ -203,17 +203,17 @@
       "version": "1.16.3",
       "dependencies": [],
       "source": {
-        "kind": "github-release"
+        "kind": "github-release",
+        "url": "https://github.com/Gentleman-Programming/engram/releases/download/v1.16.3/engram_1.16.3_windows_amd64.zip",
+        "sha256": "7e26447bf79040c79583f4cbd8acac4665e3c73ebc4eeb25d911763204dc0089",
+        "checksumUrl": "https://github.com/Gentleman-Programming/engram/releases/download/v1.16.3/checksums.txt",
+        "provenance": "project-pinned-verified-download"
       },
-      "integrityStatus": "planning-only-unverified",
+      "integrityStatus": "verified",
       "install": {
-        "allowed": false,
-        "command": "engram",
-        "arguments": [
-          "install",
-          "--version",
-          "1.16.3"
-        ]
+        "allowed": true,
+        "command": "engram-download",
+        "arguments": []
       },
       "verificationIds": [
         "engram.version",
@@ -221,7 +221,7 @@
       ],
       "required": true,
       "ownedTargets": [
-        "command:engram"
+        "path:${OPENCODE_KIT_ROOT}/bin/engram.exe"
       ]
     },
     {
@@ -233,7 +233,11 @@
       ],
       "source": {
         "kind": "python-package",
-        "package": "graphifyy"
+        "package": "graphifyy",
+        "artifact": "graphifyy-0.8.41-py3-none-any.whl",
+        "url": "https://files.pythonhosted.org/packages/11/58/28108361dfc2ee5a292ffde5a8a765515509636e396e9bbf1fb4fd5ffa90/graphifyy-0.8.41-py3-none-any.whl",
+        "sha256": "ac2134b89a801e1a8bdf8f9b2bf2ac273c60e8cb8745f5818e6b22098002ebe3",
+        "provenance": "pypi-release-metadata"
       },
       "integrityStatus": "verified",
       "install": {

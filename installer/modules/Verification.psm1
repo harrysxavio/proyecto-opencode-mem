@@ -10,7 +10,7 @@ $script:VerificationRegistry = @(
     [pscustomobject][ordered]@{ Id='python.version'; Kind='version'; Command='python'; Arguments=@('--version'); Handler=$null }
     [pscustomobject][ordered]@{ Id='uv.version'; Kind='version'; Command='uv'; Arguments=@('--version'); Handler=$null }
     [pscustomobject][ordered]@{ Id='opencode.version'; Kind='version'; Command='opencode'; Arguments=@('--version'); Handler=$null }
-    [pscustomobject][ordered]@{ Id='engram.version'; Kind='version'; Command='engram'; Arguments=@('--version'); Handler=$null }
+    [pscustomobject][ordered]@{ Id='engram.version'; Kind='version'; Command='engram'; Arguments=@('version'); Handler=$null }
     [pscustomobject][ordered]@{ Id='graphify.version'; Kind='version'; Command='graphify'; Arguments=@('--version'); Handler=$null }
     [pscustomobject][ordered]@{ Id='context7.version'; Kind='version'; Command='context7'; Arguments=@('--version'); Handler=$null }
     [pscustomobject][ordered]@{ Id='playwright.version'; Kind='version'; Command='playwright'; Arguments=@('--version'); Handler=$null }
@@ -67,6 +67,63 @@ function Test-TypedSuccessResult {
         $null -ne $Result.PSObject.Properties['Success'] -and $Result.Success -is [bool]
 }
 
+function Invoke-VerificationProcess {
+    param([string]$FilePath,[string[]]$Arguments,[System.Collections.IDictionary]$Environment,[scriptblock]$ProcessInvoker)
+    if ($null -ne $ProcessInvoker) { return & $ProcessInvoker $FilePath $Arguments $Environment }
+    $saved = @{}
+    try {
+        foreach ($key in $Environment.Keys) {
+            $saved[$key] = [Environment]::GetEnvironmentVariable([string]$key, 'Process')
+            [Environment]::SetEnvironmentVariable([string]$key, [string]$Environment[$key], 'Process')
+        }
+        Invoke-SafeProcess -FilePath $FilePath -Arguments $Arguments
+    }
+    finally { foreach ($key in $Environment.Keys) { [Environment]::SetEnvironmentVariable([string]$key, $saved[$key], 'Process') } }
+}
+
+function Test-EngramPersistence {
+    [CmdletBinding()]
+    param([string]$EngramPath='engram',[string]$TempRoot=([IO.Path]::GetTempPath()),[scriptblock]$ProcessInvoker)
+    $work = Join-Path ([IO.Path]::GetFullPath($TempRoot)) ('engram-probe-' + [guid]::NewGuid().ToString('N'))
+    $data = Join-Path $work 'data'; $canary = 'engram-canary-' + [guid]::NewGuid().ToString('N')
+    try {
+        New-Item -ItemType Directory -Path $data -Force | Out-Null
+        $environment = @{ ENGRAM_DATA_DIR=$data }
+        $save = Invoke-VerificationProcess $EngramPath @('save',$canary,$canary,'--type','discovery','--project','opencode-kit-verification','--scope','project') $environment $ProcessInvoker
+        if ($null -eq $save -or $save.ExitCode -ne 0) { return [pscustomobject]@{ Success=$false; Evidence=[pscustomobject]@{ Stage='save'; Error=$save.StdErr } } }
+        $search = Invoke-VerificationProcess $EngramPath @('search',$canary,'--project','opencode-kit-verification','--limit','5') $environment $ProcessInvoker
+        $found = $null -ne $search -and $search.ExitCode -eq 0 -and (($search.StdOut + "`n" + $search.StdErr).Contains($canary, [StringComparison]::Ordinal))
+        [pscustomobject]@{ Success=[bool]$found; Evidence=[pscustomobject]@{ Stage='restart-search'; CanaryFound=[bool]$found; Invocations=2 } }
+    }
+    catch { [pscustomobject]@{ Success=$false; Evidence=[pscustomobject]@{ Stage='exception'; Error=$_.Exception.Message } } }
+    finally { if (Test-Path -LiteralPath $work) { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue } }
+}
+
+function Test-GraphifyFixture {
+    [CmdletBinding()]
+    param(
+        [string]$GraphifyPath='graphify',
+        [string]$FixturePath=(Join-Path $PSScriptRoot '../tests/e2e/fixtures/graphify/sample.js'),
+        [string]$TempRoot=([IO.Path]::GetTempPath()),
+        [scriptblock]$ProcessInvoker
+    )
+    $work = Join-Path ([IO.Path]::GetFullPath($TempRoot)) ('graphify-probe-' + [guid]::NewGuid().ToString('N'))
+    $invoke = if ($PSBoundParameters.ContainsKey('ProcessInvoker')) { $ProcessInvoker } else { { param($FilePath,$Arguments) Invoke-SafeProcess -FilePath $FilePath -Arguments $Arguments } }
+    try {
+        New-Item -ItemType Directory -Path $work -Force | Out-Null
+        Copy-Item -LiteralPath $FixturePath -Destination (Join-Path $work 'sample.js')
+        $build = & $invoke $GraphifyPath ([string[]]@('extract',$work,'--no-cluster'))
+        if ($null -eq $build -or $build.ExitCode -ne 0) { return [pscustomobject]@{ Success=$false; Evidence=[pscustomobject]@{ Stage='extract'; Error=$build.StdErr } } }
+        $graph = Join-Path $work 'graphify-out/graph.json'
+        if (-not (Test-Path -LiteralPath $graph -PathType Leaf)) { return [pscustomobject]@{ Success=$false; Evidence=[pscustomobject]@{ Stage='extract'; Error='graph.json missing' } } }
+        $query = & $invoke $GraphifyPath ([string[]]@('query','hello','--graph',$graph))
+        $found = $null -ne $query -and $query.ExitCode -eq 0 -and (($query.StdOut + "`n" + $query.StdErr) -cmatch 'hello')
+        [pscustomobject]@{ Success=[bool]$found; Evidence=[pscustomobject]@{ Stage='query'; HelloFound=[bool]$found; Invocations=2 } }
+    }
+    catch { [pscustomobject]@{ Success=$false; Evidence=[pscustomobject]@{ Stage='exception'; Error=$_.Exception.Message } } }
+    finally { if (Test-Path -LiteralPath $work) { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue } }
+}
+
 function Invoke-VerificationId {
     [CmdletBinding()]
     param(
@@ -112,7 +169,13 @@ function Invoke-VerificationId {
         return New-VerificationResult $Id 'PASS' $null $processResult.StdOut $ExpectedVersion $actual
     }
 
-    if ($null -eq $ProbeHandlers -or -not $ProbeHandlers.Contains($descriptor.Handler) -or $ProbeHandlers[$descriptor.Handler] -isnot [scriptblock]) {
+    if ($null -eq $ProbeHandlers) {
+        $ProbeHandlers = @{
+            'engram.persist' = { Test-EngramPersistence }
+            'graphify.query' = { Test-GraphifyFixture }
+        }
+    }
+    if (-not $ProbeHandlers.Contains($descriptor.Handler) -or $ProbeHandlers[$descriptor.Handler] -isnot [scriptblock]) {
         return New-VerificationResult $Id 'NOT_READY' 'VERIFICATION_HANDLER_MISSING' $null $null $null
     }
     $handlerDescriptor = Copy-VerificationDescriptor $descriptor
@@ -128,4 +191,4 @@ function Invoke-VerificationId {
     New-VerificationResult $Id 'PASS' $null $evidence $null $null
 }
 
-Export-ModuleMember -Function Get-VerificationRegistry, Invoke-VerificationId
+Export-ModuleMember -Function Get-VerificationRegistry, Invoke-VerificationId, Test-EngramPersistence, Test-GraphifyFixture

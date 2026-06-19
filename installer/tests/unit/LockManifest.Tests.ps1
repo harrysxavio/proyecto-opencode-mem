@@ -65,11 +65,13 @@ Describe 'components.lock.json contract' {
         }
     }
 
-    It 'keeps Engram planning honest while its artifact integrity is unverified' {
+    It 'locks Engram to the verified immutable Windows artifact' {
         $engram = $lock.components | Where-Object id -EQ 'engram'
         $engram.source.kind | Should -Be 'github-release'
-        $engram.integrityStatus | Should -Be 'planning-only-unverified'
-        $engram.install.allowed | Should -BeFalse
+        $engram.integrityStatus | Should -Be 'verified'
+        $engram.install.allowed | Should -BeTrue
+        $engram.source.sha256 | Should -Be '7e26447bf79040c79583f4cbd8acac4665e3c73ebc4eeb25d911763204dc0089'
+        $engram.source.provenance | Should -Be 'project-pinned-verified-download'
     }
 
     It 'uses one canonical OpenCode root for runtime assets install and ownership' {
@@ -291,6 +293,7 @@ Describe 'Read-ComponentLock validation' {
 
         $candidate = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -Depth 30
         $engram = $candidate.components | Where-Object id -EQ 'engram'
+        $engram.integrityStatus = 'planning-only-unverified'
         $engram.install.allowed = $true
         $path = Join-Path $TestDrive 'engram-planning-allowed.json'
         $candidate | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
@@ -325,12 +328,21 @@ Describe 'Read-ComponentLock validation' {
             $engram = $candidate.components | Where-Object id -EQ 'engram'
             $engram.integrityStatus = 'verified'
             $engram.install.allowed = $true
-            $engram.source | Add-Member -NotePropertyName url -NotePropertyValue $validUrl
-            $engram.source | Add-Member -NotePropertyName sha256 -NotePropertyValue $validHash
+            $engram.source.url = $validUrl
+            $engram.source.sha256 = $validHash
             $engram.source.($case.Field) = $case.Value
             $path = Join-Path $TestDrive "$($case.Name).json"
             $candidate | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
             { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_SOURCE_INTEGRITY*'
         }
+    }
+
+    It 'rejects unpinned Engram provenance metadata' {
+        $candidate = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -Depth 30
+        $engram = $candidate.components | Where-Object id -EQ 'engram'
+        $engram.source.provenance = 'trust-me'
+        $path = Join-Path $TestDrive 'provenance.json'
+        $candidate | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path
+        { Read-ComponentLock -Path $path } | Should -Throw 'LOCK_SOURCE_INTEGRITY*'
     }
 }

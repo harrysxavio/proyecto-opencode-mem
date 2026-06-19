@@ -9,7 +9,7 @@ BeforeAll {
 
 Describe 'closed verification registry' {
     It 'exports only the minimal public API' {
-        @((Get-Command -Module Verification).Name | Sort-Object) | Should -Be @('Get-VerificationRegistry','Invoke-VerificationId')
+        @((Get-Command -Module Verification).Name | Sort-Object) | Should -Be @('Get-VerificationRegistry','Invoke-VerificationId','Test-EngramPersistence','Test-GraphifyFixture')
     }
     It 'advertises every verification ID in the lock and no duplicate IDs' {
         $registry = @(Get-VerificationRegistry)

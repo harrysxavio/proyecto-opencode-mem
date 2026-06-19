@@ -126,7 +126,8 @@ function Read-ComponentLock {
                     if ($component.install.allowed) { Throw-LockError 'LOCK_SOURCE_INTEGRITY' "Unverified GitHub release '$($component.id)' cannot be installed." }
                 }
                 elseif ($component.integrityStatus -eq 'verified') {
-                    if (-not (Test-LockProperty $component.source 'url') -or -not (Test-LockProperty $component.source 'sha256')) {
+                    if (-not (Test-LockProperty $component.source 'url') -or -not (Test-LockProperty $component.source 'sha256') -or
+                        -not (Test-LockProperty $component.source 'checksumUrl') -or -not (Test-LockProperty $component.source 'provenance')) {
                         Throw-LockError 'LOCK_SOURCE_INTEGRITY' "Component '$($component.id)' is missing GitHub release integrity metadata."
                     }
                     if ($component.source.url -isnot [string] -or [string]::IsNullOrWhiteSpace($component.source.url) -or
@@ -134,7 +135,9 @@ function Read-ComponentLock {
                         Throw-LockError 'LOCK_SOURCE_INTEGRITY' "Component '$($component.id)' GitHub release URL and hash must be strings."
                     }
                     $versionToken = [regex]::Escape([string]$component.version)
-                    if ($component.source.url -notmatch '^https://' -or $component.source.url -notmatch $versionToken -or $component.source.sha256 -notmatch '^[0-9a-f]{64}$') {
+                    if ($component.source.url -notmatch '^https://' -or $component.source.url -notmatch $versionToken -or $component.source.sha256 -notmatch '^[0-9a-f]{64}$' -or
+                        $component.source.checksumUrl -isnot [string] -or $component.source.checksumUrl -notmatch '^https://' -or $component.source.checksumUrl -notmatch $versionToken -or
+                        $component.source.provenance -isnot [string] -or $component.source.provenance -cne 'project-pinned-verified-download') {
                         Throw-LockError 'LOCK_SOURCE_INTEGRITY' "Component '$($component.id)' has invalid GitHub release integrity metadata."
                     }
                 }

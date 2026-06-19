@@ -7,6 +7,7 @@ BeforeAll {
     $lockPath = Join-Path $repoRoot 'installer/components.lock.json'
     Import-Module $lockModulePath -Force
     Import-Module $modulePath -Force
+    Import-Module (Join-Path $repoRoot 'installer/modules/Receipt.psm1') -Force
     $lock = Read-ComponentLock -Path $lockPath
 }
 
@@ -186,14 +187,17 @@ Describe 'install command contract' {
         $resolver = { param($id) [pscustomobject]@{ Present = $false; Usable = $false; Version = $null } }
         $runner = { param($FilePath, $Arguments) [pscustomobject]@{ ExitCode = 0; StdOut = ''; StdErr = '' } }
 
-        $output = @(& $commandPath -Root $repoRoot -Json -NonInteractive -ConfirmInstall -PlatformIsWindows $true -PowerShellVersion ([version]'7.5') -FreeBytes 2GB -CommandResolver $resolver -Runner $runner -ExecutableResolver { 'corepack.cmd' } -PathRefresher { } 6>&1)
+        $receipt = New-InstallReceipt -KitVersion '0.2.0-rc.1' -LockDigest ('a' * 64) -SourceCommit 'test'
+        $output = @(& $commandPath -Root $repoRoot -Json -NonInteractive -ConfirmInstall -PlatformIsWindows $true -PowerShellVersion ([version]'7.5') -FreeBytes 2GB -CommandResolver $resolver -Runner $runner -ExecutableResolver { 'corepack.cmd' } -PathRefresher { } -CoreReceipt $receipt -CoreExecutor { param($c,$p) [pscustomobject]@{Success=$true;Evidence=$p} } -CoreVerifier { [pscustomobject]@{Status='PASS'} } -CoreCheckpointWriter { param($candidate) } 6>&1)
 
         $output.Count | Should -Be 1
         $document = $output[0] | ConvertFrom-Json -Depth 20
         $document.preflight.Platform | Should -Be 'windows-powershell'
         @($document.plan.Items).Count | Should -Be 5
-        @($document.actions).Count | Should -Be 5
+        @($document.actions).Count | Should -Be 8
+        @($document.core).Count | Should -Be 3
         $document.state | Should -Be 'COMPLETED'
         $document.result.Status | Should -Be 'COMPLETED'
+        $document.coreResult.Status | Should -Be 'COMPLETED'
     }
 }
