@@ -91,7 +91,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 ### 2026-06-18 — Task 4
 
 - Status: `completed`.
-- Commits: inicio `01f8acf`; implementación `49cb141`; remediaciones de seguridad `77bab38`, `1441d65`.
+- Commits: inicio `01f8acf`; implementación `49cb141`; remediaciones de seguridad/calidad `77bab38`, `1441d65`, `6c32ffc`.
 - Tests:
   - TDD RED inicial: `0/12` passed; `12/12` fallaron por módulo y comando ausentes.
   - TDD RED forwarding: `8/9` passed; `1/9` falló por parámetros de rollback aún ausentes.
@@ -101,14 +101,16 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
   - Spec remediation GREEN: `15/15`.
   - Callback isolation RED: `6/7` passed; el callback mutó el target después de validar.
   - Callback isolation GREEN: `7/7` con plan ejecutable de tuplas inmutables y DTOs de salida nuevos.
-  - `pnpm test:powershell`: `74/74`.
+  - Quality remediation RED: `9/13` passed; fallaron IDs ambiguos, colisiones file/directory y staging ausente.
+  - Quality remediation GREEN: `13/13` con publicación exclusiva y verificada.
+  - `pnpm test:powershell`: `78/78`.
   - `pnpm test:all`: `109/109`.
   - `pnpm docs:check`: `PASS`.
   - `git diff --check`: `PASS`.
 - Reviews:
   - Self-review: `APPROVED`.
   - Spec: `PENDING RE-REVIEW` tras remediar prevalidación de `BackupRoot`, conflictos globales y mutación del plan desde `ConfirmationReader`.
-  - Quality: `PENDING`.
+  - Quality: `PENDING RE-REVIEW` tras remediar colisiones/publicación de backups e IDs ambiguos de componentes.
 
 ## Decisiones
 
