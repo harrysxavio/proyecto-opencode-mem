@@ -115,7 +115,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 ### 2026-06-18 — Task 5
 
 - Status: `completed`.
-- Commits: inicio `e29b5ca`; implementación `24d4ab0`; remediación Spec `8193dc7`.
+- Commits: inicio `e29b5ca`; implementación `24d4ab0`; remediación Spec `8193dc7`; hardening Quality `2caa3b9`.
 - Tests:
   - TDD RED inicial: `0/13` passed; `13/13` fallaron por módulo y funciones ausentes.
   - TDD GREEN base: `13/13`.
@@ -125,14 +125,16 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
   - TDD GREEN focalizado final: `17/17`.
   - Spec remediation RED: `15/20` passed; fallaron validación recursiva de arrays y atomicidad del receipt.
   - Spec remediation GREEN: `20/20` con receipt validado/clonado y arrays validados recursivamente.
-  - `pnpm test:powershell`: `98/98`.
+  - Quality hardening RED: `18/24` passed; fallaron fidelidad numérica, comparación sin overflow, case sensitivity y seams TOCTOU.
+  - Quality hardening GREEN: `24/24` con tokens numéricos raw, canonicalización BigInteger, diccionarios ordinales y locks/revalidación fail-closed.
+  - `pnpm test:powershell`: `102/102`.
   - `pnpm test:all`: `109/109`.
   - `pnpm docs:check`: `PASS`.
   - `git diff --check`: `PASS`.
 - Reviews:
   - Self-review: `APPROVED`.
   - Spec: `PENDING RE-REVIEW` tras remediar validación transaccional del receipt y shapes recursivos de arrays.
-  - Quality: `PENDING`.
+  - Quality: `PENDING RE-REVIEW` tras remediar fidelidad numérica, case sensitivity y lost updates/TOCTOU.
 
 ## Decisiones
 
