@@ -48,6 +48,20 @@ Describe 'receipt identity and schema' {
             { Read-InstallReceipt -Path $path -ReceiptRoot $root -AllowedRoots @($TestDrive) } | Should -Throw 'RECEIPT_*'
         }
     }
+
+    It 'rejects blank and ordinal-duplicate component ids with stable errors' {
+        $blank = New-TestReceipt
+        $blank.components = @([pscustomobject]@{ id = '  '; state = 'PLANNED' })
+        { Assert-InstallReceipt $blank } | Should -Throw 'RECEIPT_COMPONENT_ID_INVALID*'
+
+        $duplicate = New-TestReceipt
+        $duplicate.components = @(
+            [pscustomobject]@{ id = 'component'; state = 'PLANNED' },
+            [pscustomobject]@{ id = 'component'; state = 'CONFIGURED' }
+        )
+        { Assert-InstallReceipt $duplicate } | Should -Throw 'RECEIPT_COMPONENT_ID_DUPLICATE*'
+        { Set-ReceiptComponentState (New-TestReceipt) ' ' 'PLANNED' } | Should -Throw 'RECEIPT_COMPONENT_ID_INVALID*'
+    }
 }
 
 Describe 'receipt persistence and ownership' {
@@ -107,12 +121,61 @@ Describe 'receipt persistence and ownership' {
         Test-Path -LiteralPath $outsideContainer | Should -BeFalse
     }
 
+    It 'does not overwrite a file backup when two receipts collide on backup id and item number' {
+        $allowed = Join-Path $TestDrive 'file-collision'; $backupRoot = Join-Path $TestDrive 'file-collision-backups'
+        New-Item -ItemType Directory $allowed -Force | Out-Null
+        $source = Join-Path $allowed 'settings.bin'; [IO.File]::WriteAllBytes($source, [byte[]](1,2,3))
+        $first = New-TestReceipt
+        Backup-InstallPath $first $source $backupRoot '20260618T123456Z-a1b2c3d4' @($allowed)
+        [IO.File]::WriteAllBytes($source, [byte[]](9,8,7))
+
+        { Backup-InstallPath (New-TestReceipt) $source $backupRoot '20260618T123456Z-a1b2c3d4' @($allowed) } |
+            Should -Throw 'BACKUP_DESTINATION_EXISTS*'
+        [IO.File]::ReadAllBytes($first.backups[0].backupPath) | Should -Be ([byte[]](1,2,3))
+    }
+
+    It 'does not merge or overwrite a directory backup on destination collision' {
+        $allowed = Join-Path $TestDrive 'dir-collision'; $backupRoot = Join-Path $TestDrive 'dir-collision-backups'
+        $tree = Join-Path $allowed 'tree'; New-Item -ItemType Directory (Join-Path $tree 'sub') -Force | Out-Null
+        'first' | Set-Content (Join-Path $tree 'sub/first.txt') -NoNewline
+        $first = New-TestReceipt
+        Backup-InstallPath $first $tree $backupRoot '20260618T123457Z-a1b2c3d4' @($allowed)
+        Remove-Item $tree -Recurse; New-Item -ItemType Directory $tree -Force | Out-Null
+        'second' | Set-Content (Join-Path $tree 'second.txt') -NoNewline
+
+        { Backup-InstallPath (New-TestReceipt) $tree $backupRoot '20260618T123457Z-a1b2c3d4' @($allowed) } |
+            Should -Throw 'BACKUP_DESTINATION_EXISTS*'
+        (Get-Content (Join-Path $first.backups[0].backupPath 'sub/first.txt') -Raw) | Should -Be 'first'
+        Test-Path (Join-Path $first.backups[0].backupPath 'second.txt') | Should -BeFalse
+    }
+
+    It 'cleans failed staging and permits an exact retry' {
+        $allowed = Join-Path $TestDrive 'copy-failure'; $backupRoot = Join-Path $TestDrive 'copy-failure-backups'
+        New-Item -ItemType Directory $allowed -Force | Out-Null
+        $source = Join-Path $allowed 'source.bin'; [IO.File]::WriteAllBytes($source, [byte[]](5,4,3,2,1))
+        $receipt = New-TestReceipt
+        $failingCopy = {
+            param($Source, $Destination, $Type)
+            [IO.File]::WriteAllText($Destination, 'partial')
+            throw 'SIMULATED_COPY_FAILURE'
+        }
+
+        { Backup-InstallPath $receipt $source $backupRoot '20260618T123458Z-a1b2c3d4' @($allowed) -CopyOperation $failingCopy } |
+            Should -Throw 'SIMULATED_COPY_FAILURE*'
+        $container = Join-Path $backupRoot '20260618T123458Z-a1b2c3d4'
+        if (Test-Path $container) { @(Get-ChildItem $container -Force).Count | Should -Be 0 }
+
+        $record = Backup-InstallPath $receipt $source $backupRoot '20260618T123458Z-a1b2c3d4' @($allowed)
+        [IO.File]::ReadAllBytes($record.backupPath) | Should -Be ([byte[]](5,4,3,2,1))
+    }
+
     It 'finds the first component not yet verified for resume' {
         $receipt = New-TestReceipt
         Set-ReceiptComponentState $receipt 'one' 'VERIFIED'
         Set-ReceiptComponentState $receipt 'two' 'CONFIGURED'
         Set-ReceiptComponentState $receipt 'three' 'PLANNED'
         (Get-ReceiptResumeComponent -Receipt $receipt).id | Should -Be 'two'
+        @($receipt.components.id) | Should -Be @('one', 'two', 'three')
         { Set-ReceiptComponentState $receipt 'three' 'BROKEN' } | Should -Throw 'RECEIPT_COMPONENT_INVALID*'
     }
 }

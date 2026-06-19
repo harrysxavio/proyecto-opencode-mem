@@ -84,6 +84,42 @@ function Assert-StringArray {
     foreach ($entry in $Value) { if ($entry -isnot [string] -or [string]::IsNullOrWhiteSpace($entry)) { throw "RECEIPT_TYPE_INVALID:$Name" } }
 }
 
+function Get-FileSha256 {
+    param([Parameter(Mandatory)][string]$Path)
+    $stream = [IO.File]::OpenRead($Path)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { [Convert]::ToHexString($sha.ComputeHash($stream)).ToLowerInvariant() }
+    finally { $sha.Dispose(); $stream.Dispose() }
+}
+
+function Get-DirectoryFingerprint {
+    param([Parameter(Mandatory)][string]$Root)
+    @(
+        Get-ChildItem -LiteralPath $Root -Force -Recurse | ForEach-Object {
+            $relative = [IO.Path]::GetRelativePath($Root, $_.FullName).Replace([IO.Path]::DirectorySeparatorChar, '/')
+            if ($_.PSIsContainer) { "D:$relative" }
+            else { "F:$relative`:$($_.Length):$(Get-FileSha256 $_.FullName)" }
+        } | Sort-Object -CaseSensitive
+    )
+}
+
+function Assert-BackupCopyComplete {
+    param([string]$Source, [string]$StagingPath, [string]$Type)
+    if ($Type -eq 'file') {
+        if (-not (Test-Path -LiteralPath $StagingPath -PathType Leaf) -or
+            (Get-Item -LiteralPath $Source).Length -ne (Get-Item -LiteralPath $StagingPath).Length -or
+            (Get-FileSha256 $Source) -cne (Get-FileSha256 $StagingPath)) { throw 'BACKUP_COPY_INCOMPLETE' }
+        return
+    }
+    if (-not (Test-Path -LiteralPath $StagingPath -PathType Container)) { throw 'BACKUP_COPY_INCOMPLETE' }
+    $sourceFingerprint = @(Get-DirectoryFingerprint $Source)
+    $stagingFingerprint = @(Get-DirectoryFingerprint $StagingPath)
+    if ($sourceFingerprint.Count -ne $stagingFingerprint.Count) { throw 'BACKUP_COPY_INCOMPLETE' }
+    for ($index = 0; $index -lt $sourceFingerprint.Count; $index++) {
+        if ($sourceFingerprint[$index] -cne $stagingFingerprint[$index]) { throw 'BACKUP_COPY_INCOMPLETE' }
+    }
+}
+
 function Assert-InstallReceipt {
     [CmdletBinding()]
     param([Parameter(Mandatory)][object]$Receipt)
@@ -96,9 +132,11 @@ function Assert-InstallReceipt {
     if (-not [datetimeoffset]::TryParse($Receipt.createdAt, [ref]$parsed) -or $parsed.Offset -ne [timespan]::Zero) { throw 'RECEIPT_TYPE_INVALID:createdAt' }
     if ($Receipt.state -isnot [string] -or $script:ReceiptStates -cnotcontains $Receipt.state) { throw 'RECEIPT_STATE_INVALID' }
     if ($Receipt.components -isnot [array]) { throw 'RECEIPT_TYPE_INVALID:components' }
+    $componentIds = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach ($component in $Receipt.components) {
-        if ($null -eq $component.PSObject.Properties['id'] -or $component.id -isnot [string] -or
-            $null -eq $component.PSObject.Properties['state'] -or $script:ComponentStates -cnotcontains $component.state) { throw 'RECEIPT_COMPONENT_INVALID' }
+        if ($null -eq $component.PSObject.Properties['id'] -or $component.id -isnot [string] -or [string]::IsNullOrWhiteSpace($component.id)) { throw 'RECEIPT_COMPONENT_ID_INVALID' }
+        if (-not $componentIds.Add($component.id)) { throw 'RECEIPT_COMPONENT_ID_DUPLICATE' }
+        if ($null -eq $component.PSObject.Properties['state'] -or $script:ComponentStates -cnotcontains $component.state) { throw 'RECEIPT_COMPONENT_INVALID' }
     }
     Assert-StringArray $Receipt.ownedPaths 'ownedPaths'
     Assert-StringArray $Receipt.ownedKeys 'ownedKeys'
@@ -198,7 +236,8 @@ function Backup-InstallPath {
         [Parameter(Mandatory,Position=1)][string]$Path,
         [Parameter(Mandatory,Position=2)][string]$BackupRoot,
         [Parameter(Mandatory,Position=3)][string]$BackupId,
-        [Parameter(Mandatory,Position=4)][string[]]$AllowedRoots
+        [Parameter(Mandatory,Position=4)][string[]]$AllowedRoots,
+        [scriptblock]$CopyOperation
     )
     [void](Assert-SafeBackupId $BackupId)
     $full = Assert-OwnedPath -Path $Path -AllowedRoots $AllowedRoots -AllowMissing
@@ -219,10 +258,30 @@ function Backup-InstallPath {
         }
         $container = Join-Path $fullBackupRoot $BackupId
         $backupPath = Join-Path $container ('item-' + @($Receipt.backups).Count.ToString('D8'))
+        $stagingPath = Join-Path $container ('.' + [IO.Path]::GetFileName($backupPath) + '.' + [guid]::NewGuid().ToString('N') + '.stage')
         [void](Assert-OwnedPath -Path $container -AllowedRoots @($fullBackupRoot) -AllowMissing)
         [void](Assert-OwnedPath -Path $backupPath -AllowedRoots @($BackupRoot) -AllowMissing)
+        [void](Assert-OwnedPath -Path $stagingPath -AllowedRoots @($BackupRoot) -AllowMissing)
+        if (Test-Path -LiteralPath $backupPath) { throw "BACKUP_DESTINATION_EXISTS:$backupPath" }
+        if ((Test-Path -LiteralPath $container) -and -not (Test-Path -LiteralPath $container -PathType Container)) { throw "BACKUP_DESTINATION_EXISTS:$container" }
         New-Item -ItemType Directory -Path $container -Force | Out-Null
-        Copy-Item -LiteralPath $full -Destination $backupPath -Recurse -Force
+        if (Test-Path -LiteralPath $backupPath) { throw "BACKUP_DESTINATION_EXISTS:$backupPath" }
+        $copy = if ($PSBoundParameters.ContainsKey('CopyOperation')) { $CopyOperation } else {
+            { param($Source, $Destination, $Type) Copy-Item -LiteralPath $Source -Destination $Destination -Recurse -Force }
+        }
+        try {
+            & $copy $full $stagingPath $type
+            Assert-BackupCopyComplete -Source $full -StagingPath $stagingPath -Type $type
+            if (Test-Path -LiteralPath $backupPath) { throw "BACKUP_DESTINATION_EXISTS:$backupPath" }
+            if ($type -eq 'directory') { [IO.Directory]::Move($stagingPath, $backupPath) }
+            else { [IO.File]::Move($stagingPath, $backupPath) }
+        }
+        catch {
+            $collision = Test-Path -LiteralPath $backupPath
+            if (Test-Path -LiteralPath $stagingPath) { Remove-Item -LiteralPath $stagingPath -Recurse -Force }
+            if ($collision) { throw "BACKUP_DESTINATION_EXISTS:$backupPath" }
+            throw
+        }
     }
     $record = [pscustomobject][ordered]@{ path = $full; backupPath = $backupPath; existed = [bool]$exists; type = $type }
     $Receipt.backups = @($Receipt.backups) + $record
@@ -233,6 +292,7 @@ function Backup-InstallPath {
 function Get-ReceiptResumeComponent {
     [CmdletBinding()]
     param([Parameter(Mandatory)][object]$Receipt)
+    [void](Assert-InstallReceipt $Receipt)
     @($Receipt.components | Where-Object state -CNE 'VERIFIED' | Select-Object -First 1)[0]
 }
 
@@ -243,7 +303,9 @@ function Set-ReceiptComponentState {
         [Parameter(Mandatory,Position=1)][string]$Id,
         [Parameter(Mandatory,Position=2)][string]$State
     )
-    if ([string]::IsNullOrWhiteSpace($Id) -or $script:ComponentStates -cnotcontains $State) { throw 'RECEIPT_COMPONENT_INVALID' }
+    [void](Assert-InstallReceipt $Receipt)
+    if ([string]::IsNullOrWhiteSpace($Id)) { throw 'RECEIPT_COMPONENT_ID_INVALID' }
+    if ($script:ComponentStates -cnotcontains $State) { throw 'RECEIPT_COMPONENT_INVALID' }
     $matches = @($Receipt.components | Where-Object { $_.id -ceq $Id })
     if ($matches.Count -gt 0) { $matches[0].state = $State }
     else { $Receipt.components = @($Receipt.components) + [pscustomobject][ordered]@{ id = $Id; state = $State } }
