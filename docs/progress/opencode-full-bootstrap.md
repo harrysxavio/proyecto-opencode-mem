@@ -24,7 +24,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 | Task 2 | [Build the safe process runner and public command router](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-2-build-the-safe-process-runner-and-public-command-router) | `completed` |
 | Task 3 | [Implement Windows preflight and confirmed prerequisite installation](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-3-implement-windows-preflight-and-confirmed-prerequisite-installation) | `completed` |
 | Task 4 | [Add receipts, backups, checkpoints, resume and safe rollback](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-4-add-receipts-backups-checkpoints-resume-and-safe-rollback) | `completed` |
-| Task 5 | [Compose OpenCode JSON/JSONC without overwriting user entries](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-5-compose-opencode-jsonjsonc-without-overwriting-user-entries) | `in_progress` |
+| Task 5 | [Compose OpenCode JSON/JSONC without overwriting user entries](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-5-compose-opencode-jsonjsonc-without-overwriting-user-entries) | `completed` |
 | Task 6 | [Implement dependency execution and the verification registry](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-6-implement-dependency-execution-and-the-verification-registry) | `pending` |
 | Task 7 | [Install the pinned OpenCode, Engram and Graphify core](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-7-install-the-pinned-opencode-engram-and-graphify-core) | `pending` |
 | Task 8 | [Configure and probe credential-free MCP servers](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-8-configure-and-probe-credential-free-mcp-servers) | `pending` |
@@ -38,7 +38,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 
 ## Estado actual
 
-- Tarea activa: [Task 5 — Compose OpenCode JSON/JSONC without overwriting user entries](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-5-compose-opencode-jsonjsonc-without-overwriting-user-entries) (`in_progress`).
+- Tarea activa: ninguna.
 - Siguiente tarea: [Task 6 — Implement dependency execution and the verification registry](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-6-implement-dependency-execution-and-the-verification-registry) (`pending`).
 
 ## Checkpoints
@@ -114,10 +114,23 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 
 ### 2026-06-18 — Task 5
 
-- Status: `in_progress`.
-- Commits: inicio pendiente.
-- Tests: TDD pendiente.
-- Reviews: pendientes.
+- Status: `completed`.
+- Commits: inicio `e29b5ca`; implementación `24d4ab0`.
+- Tests:
+  - TDD RED inicial: `0/13` passed; `13/13` fallaron por módulo y funciones ausentes.
+  - TDD GREEN base: `13/13`.
+  - Quality RED backup: `15/16` passed; faltaba inyección de fallo de backup.
+  - Quality RED semántica/forma: `15/17` passed; fallaron equivalencia numérica y tipos raíz inválidos.
+  - Quality RED claves no string: `16/17` passed.
+  - TDD GREEN focalizado final: `17/17`.
+  - `pnpm test:powershell`: `95/95`.
+  - `pnpm test:all`: `109/109`.
+  - `pnpm docs:check`: `PASS`.
+  - `git diff --check`: `PASS`.
+- Reviews:
+  - Self-review: `APPROVED`.
+  - Spec: `PENDING`.
+  - Quality: `PENDING`.
 
 ## Decisiones
 
