@@ -91,7 +91,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 ### 2026-06-18 — Task 4
 
 - Status: `completed`.
-- Commits: inicio `01f8acf`; implementación `49cb141`; remediación de seguridad `77bab38`.
+- Commits: inicio `01f8acf`; implementación `49cb141`; remediaciones de seguridad `77bab38`, `1441d65`.
 - Tests:
   - TDD RED inicial: `0/12` passed; `12/12` fallaron por módulo y comando ausentes.
   - TDD RED forwarding: `8/9` passed; `1/9` falló por parámetros de rollback aún ausentes.
@@ -99,13 +99,15 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
   - TDD GREEN focalizado: `17/17`.
   - Spec remediation RED: `13/15` passed; `2/15` fallaron al reproducir creación vía junction y solapamiento destructivo source/target.
   - Spec remediation GREEN: `15/15`.
-  - `pnpm test:powershell`: `73/73`.
+  - Callback isolation RED: `6/7` passed; el callback mutó el target después de validar.
+  - Callback isolation GREEN: `7/7` con plan ejecutable de tuplas inmutables y DTOs de salida nuevos.
+  - `pnpm test:powershell`: `74/74`.
   - `pnpm test:all`: `109/109`.
   - `pnpm docs:check`: `PASS`.
   - `git diff --check`: `PASS`.
 - Reviews:
   - Self-review: `APPROVED`.
-  - Spec: `PENDING RE-REVIEW` tras remediar prevalidación de `BackupRoot` y conflictos globales del plan de rollback.
+  - Spec: `PENDING RE-REVIEW` tras remediar prevalidación de `BackupRoot`, conflictos globales y mutación del plan desde `ConfirmationReader`.
   - Quality: `PENDING`.
 
 ## Decisiones
