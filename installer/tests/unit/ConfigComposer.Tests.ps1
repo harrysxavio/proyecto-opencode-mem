@@ -89,6 +89,29 @@ Describe 'Merge-OpenCodeConfig' {
         )
         foreach ($owned in $bad) { { Merge-OpenCodeConfig '{}' $owned } | Should -Throw 'CONFIG_OWNED_KEY_INVALID*' }
     }
+
+    It 'validates keys recursively inside arrays and rejects invalid root array primitives' {
+        $bad = @(
+            [ordered]@{ plugin = @([ordered]@{ '__proto__' = 'bad' }) },
+            [ordered]@{ instructions = @([ordered]@{ nested = @([ordered]@{ 'bad.key' = 'bad' }) }) },
+            [ordered]@{ plugin = @($null) },
+            [ordered]@{ plugin = @($true) },
+            [ordered]@{ instructions = @(42) },
+            [ordered]@{ instructions = @(,@('nested-array')) }
+        )
+        foreach ($owned in $bad) { { Merge-OpenCodeConfig '{}' $owned } | Should -Throw 'CONFIG_OWNED_KEY_INVALID*' }
+    }
+
+    It 'accepts documented string and object array entries idempotently' {
+        $owned = [ordered]@{
+            plugin = @('kit-plugin', [ordered]@{ name = 'object-plugin'; options = [ordered]@{ mode = 'safe' } })
+            instructions = @('AGENTS.md')
+        }
+        $first = Merge-OpenCodeConfig '{}' $owned
+        $second = Merge-OpenCodeConfig $first.Json $owned
+        $first.Changed | Should -BeTrue
+        $second.Changed | Should -BeFalse
+    }
 }
 
 Describe 'Write-OpenCodeConfig' {
@@ -106,10 +129,27 @@ Describe 'Write-OpenCodeConfig' {
         [IO.File]::WriteAllBytes($path, $bytes)
         $result = Write-OpenCodeConfig -ConfigPath $path -OpenCodeConfigRoot $root -Owned (New-EngramOwned) -Receipt $receipt -BackupRoot $backupRoot -BackupId $backupId
         $result.Changed | Should -BeTrue
-        $receipt.backups.Count | Should -Be 1
-        [IO.File]::ReadAllBytes($receipt.backups[0].backupPath) | Should -Be $bytes
-        $receipt.ownedKeys | Should -Be @('mcp.engram.command', 'mcp.engram.enabled')
+        $receipt.backups.Count | Should -Be 0
+        $result.Receipt.backups.Count | Should -Be 1
+        [IO.File]::ReadAllBytes($result.Receipt.backups[0].backupPath) | Should -Be $bytes
+        $result.Receipt.ownedKeys | Should -Be @('mcp.engram.command', 'mcp.engram.enabled')
+        $result.Receipt.ownedPaths | Should -Contain ([IO.Path]::GetFullPath($path))
+        $result.UpdatedReceipt.ownedKeys | Should -Be $result.Receipt.ownedKeys
         @(Get-ChildItem $root -Filter '*.tmp' -Force).Count | Should -Be 0
+    }
+
+    It 'validates the complete receipt before backup or write without mutating either original' {
+        $original = '{"mcp":{}}'; [IO.File]::WriteAllText($path, $original)
+        $missingPaths = New-TestReceipt; $missingPaths.PSObject.Properties.Remove('ownedPaths')
+        $missingKeys = New-TestReceipt; $missingKeys.PSObject.Properties.Remove('ownedKeys')
+        $badSchema = New-TestReceipt; $badSchema.schemaVersion = 2
+        foreach ($badReceipt in @($missingPaths, $missingKeys, $badSchema)) {
+            $before = ConvertTo-Json -InputObject $badReceipt -Depth 20 -Compress
+            { Write-OpenCodeConfig $path $root (New-EngramOwned) $badReceipt $backupRoot $backupId } | Should -Throw 'RECEIPT_*'
+            [IO.File]::ReadAllText($path) | Should -Be $original
+            (ConvertTo-Json -InputObject $badReceipt -Depth 20 -Compress) | Should -Be $before
+            Test-Path $backupRoot | Should -BeFalse
+        }
     }
 
     It 'does not back up or write on collision and leaves the original unchanged' {
@@ -133,17 +173,19 @@ Describe 'Write-OpenCodeConfig' {
         { Write-OpenCodeConfig $path $root (New-EngramOwned) $receipt $backupRoot $backupId -BackupCopyOperation $copy } | Should -Throw 'simulated backup failure'
         [IO.File]::ReadAllText($path) | Should -Be $original
         $receipt.backups.Count | Should -Be 0
+        $receipt.ownedKeys.Count | Should -Be 0
     }
 
     It 'records absent creation and performs no duplicate backup or write on the second run' {
         $first = Write-OpenCodeConfig $path $root (New-EngramOwned) $receipt $backupRoot $backupId
         $stamp = (Get-Item $path).LastWriteTimeUtc
         Start-Sleep -Milliseconds 30
-        $second = Write-OpenCodeConfig $path $root (New-EngramOwned) $receipt $backupRoot $backupId
+        $second = Write-OpenCodeConfig $path $root (New-EngramOwned) $first.Receipt $backupRoot $backupId
         $first.Changed | Should -BeTrue
         $second.Changed | Should -BeFalse
-        $receipt.backups.Count | Should -Be 1
-        $receipt.backups[0].type | Should -Be 'absent'
+        $receipt.backups.Count | Should -Be 0
+        $second.Receipt.backups.Count | Should -Be 1
+        $second.Receipt.backups[0].type | Should -Be 'absent'
         (Get-Item $path).LastWriteTimeUtc | Should -Be $stamp
     }
 
@@ -152,6 +194,9 @@ Describe 'Write-OpenCodeConfig' {
         $operation = { param($TempPath, $Destination, $Json) [IO.File]::WriteAllText($TempPath, $Json); throw 'simulated interruption' }
         { Write-OpenCodeConfig $path $root (New-EngramOwned) $receipt $backupRoot $backupId -AtomicWriteOperation $operation } | Should -Throw 'simulated interruption'
         [IO.File]::ReadAllText($path) | Should -Be $original
+        $receipt.ownedPaths.Count | Should -Be 0
+        $receipt.ownedKeys.Count | Should -Be 0
+        $receipt.backups.Count | Should -Be 0
         @(Get-ChildItem $root -Filter '*.tmp' -Force).Count | Should -Be 0
     }
 

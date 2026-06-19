@@ -65,7 +65,9 @@ function Copy-ConfigValue {
         return $copy
     }
     if ($Value -is [Collections.IEnumerable] -and $Value -isnot [string]) {
-        return ,@($Value | ForEach-Object { Copy-ConfigValue $_ })
+        $items = [Collections.Generic.List[object]]::new()
+        foreach ($entry in $Value) { $items.Add((Copy-ConfigValue $entry)) }
+        return ,$items.ToArray()
     }
     if ($Value.GetType() -eq [pscustomobject]) {
         $copy = [ordered]@{}
@@ -129,9 +131,41 @@ function Assert-ConfigOwnedTree {
                 ($value -is [string] -or $value -is [Collections.IDictionary] -or $value -isnot [Collections.IEnumerable])) {
                 throw "CONFIG_OWNED_KEY_INVALID:$path"
             }
+            if ($key -in @('plugin', 'instructions')) {
+                $index = 0
+                foreach ($entry in $value) {
+                    $entryPath = "$path[$index]"
+                    if ($entry -is [string]) {
+                        if ([string]::IsNullOrWhiteSpace($entry) -or $entry -match '[\x00-\x1f\x7f]') { throw "CONFIG_OWNED_KEY_INVALID:$entryPath" }
+                    }
+                    elseif ($entry -is [Collections.IDictionary]) { Assert-ConfigOwnedTree -Node $entry -Prefix $entryPath }
+                    else { throw "CONFIG_OWNED_KEY_INVALID:$entryPath" }
+                    $index++
+                }
+                continue
+            }
         }
         if ($value -is [Collections.IDictionary]) { Assert-ConfigOwnedTree -Node $value -Prefix $path }
-        elseif ($value -is [pscustomobject]) { Assert-ConfigOwnedTree -Node (Copy-ConfigValue $value) -Prefix $path }
+        elseif ($value -is [Collections.IEnumerable] -and $value -isnot [string]) {
+            $index = 0
+            foreach ($entry in $value) {
+                if ($entry -is [Collections.IDictionary]) { Assert-ConfigOwnedTree -Node $entry -Prefix "$path[$index]" }
+                elseif ($entry -is [Collections.IEnumerable] -and $entry -isnot [string]) {
+                    Assert-ConfigOwnedArray -Values $entry -Prefix "$path[$index]"
+                }
+                $index++
+            }
+        }
+    }
+}
+
+function Assert-ConfigOwnedArray {
+    param([Collections.IEnumerable]$Values, [string]$Prefix)
+    $index = 0
+    foreach ($entry in $Values) {
+        if ($entry -is [Collections.IDictionary]) { Assert-ConfigOwnedTree -Node $entry -Prefix "$Prefix[$index]" }
+        elseif ($entry -is [Collections.IEnumerable] -and $entry -isnot [string]) { Assert-ConfigOwnedArray -Values $entry -Prefix "$Prefix[$index]" }
+        $index++
     }
 }
 
@@ -219,6 +253,22 @@ function Assert-ConfigPath {
     return $fullPath
 }
 
+function Copy-ValidatedInstallReceipt {
+    param([Parameter(Mandatory)][object]$Receipt)
+    [void](Assert-InstallReceipt $Receipt)
+    $json = ConvertTo-Json -InputObject $Receipt -Depth 100 -Compress
+    $copy = $json | ConvertFrom-Json -Depth 100 -DateKind String
+    [void](Assert-InstallReceipt $copy)
+    return $copy
+}
+
+function Add-ReceiptToMergeResult {
+    param([Parameter(Mandatory)][object]$Merge, [Parameter(Mandatory)][object]$Receipt)
+    $Merge | Add-Member -MemberType NoteProperty -Name Receipt -Value $Receipt -Force
+    $Merge | Add-Member -MemberType NoteProperty -Name UpdatedReceipt -Value $Receipt -Force
+    return $Merge
+}
+
 function Write-OpenCodeConfig {
     [CmdletBinding()]
     param(
@@ -236,11 +286,16 @@ function Write-OpenCodeConfig {
     if ((Test-Path -LiteralPath $fullPath) -and -not $exists) { throw "CONFIG_PATH_OUTSIDE_ROOT:$ConfigPath" }
     $existingText = if ($exists) { [IO.File]::ReadAllText($fullPath, [Text.Encoding]::UTF8) } else { '{}' }
     $merge = Merge-OpenCodeConfig -ExistingText $existingText -Owned $Owned
-    if (-not $merge.Changed) { return $merge }
+    $receiptCopy = Copy-ValidatedInstallReceipt $Receipt
+    Add-ReceiptOwnedPath -Receipt $receiptCopy -Path $fullPath
+    foreach ($key in $merge.OwnedKeys) { Add-ReceiptOwnedKey -Receipt $receiptCopy -Key $key }
+    [void](Assert-InstallReceipt $receiptCopy)
+    if (-not $merge.Changed) { return Add-ReceiptToMergeResult -Merge $merge -Receipt $receiptCopy }
 
-    $backupParameters = @{ Receipt = $Receipt; Path = $fullPath; BackupRoot = $BackupRoot; BackupId = $BackupId; AllowedRoots = @($OpenCodeConfigRoot) }
+    $backupParameters = @{ Receipt = $receiptCopy; Path = $fullPath; BackupRoot = $BackupRoot; BackupId = $BackupId; AllowedRoots = @($OpenCodeConfigRoot) }
     if ($PSBoundParameters.ContainsKey('BackupCopyOperation')) { $backupParameters.CopyOperation = $BackupCopyOperation }
     [void](Backup-InstallPath @backupParameters)
+    [void](Assert-InstallReceipt $receiptCopy)
     $parent = [IO.Path]::GetDirectoryName($fullPath)
     New-Item -ItemType Directory -Path $parent -Force | Out-Null
     $temp = Join-Path $parent ('.' + [IO.Path]::GetFileName($fullPath) + '.' + [guid]::NewGuid().ToString('N') + '.tmp')
@@ -252,9 +307,7 @@ function Write-OpenCodeConfig {
         }
     }
     finally { if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Force } }
-    Add-ReceiptOwnedPath -Receipt $Receipt -Path $fullPath
-    foreach ($key in $merge.OwnedKeys) { Add-ReceiptOwnedKey -Receipt $Receipt -Key $key }
-    return $merge
+    return Add-ReceiptToMergeResult -Merge $merge -Receipt $receiptCopy
 }
 
 Export-ModuleMember -Function ConvertFrom-Jsonc, Merge-OpenCodeConfig, Write-OpenCodeConfig
