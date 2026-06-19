@@ -25,12 +25,21 @@ $script:VerificationRegistry = @(
     [pscustomobject][ordered]@{ Id='config.browserbase'; Kind='functional'; Command=$null; Arguments=@(); Handler='config.browserbase' }
 )
 
+function Copy-VerificationDescriptor {
+    param([Parameter(Mandatory)][object]$Descriptor)
+    [pscustomobject][ordered]@{
+        Id = [string]$Descriptor.Id
+        Kind = [string]$Descriptor.Kind
+        Command = if ($null -eq $Descriptor.Command) { $null } else { [string]$Descriptor.Command }
+        Arguments = [string[]]@($Descriptor.Arguments | ForEach-Object { [string]$_ })
+        Handler = if ($null -eq $Descriptor.Handler) { $null } else { [string]$Descriptor.Handler }
+    }
+}
+
 function Get-VerificationRegistry {
     [CmdletBinding()]
     param()
-    foreach ($entry in $script:VerificationRegistry) {
-        [pscustomobject][ordered]@{ Id=$entry.Id; Kind=$entry.Kind; Command=$entry.Command; Arguments=[string[]]@($entry.Arguments); Handler=$entry.Handler }
-    }
+    foreach ($entry in $script:VerificationRegistry) { Copy-VerificationDescriptor $entry }
 }
 
 function New-VerificationResult {
@@ -78,7 +87,8 @@ function Invoke-VerificationId {
         $invoker = if ($PSBoundParameters.ContainsKey('ProcessInvoker')) { $ProcessInvoker } else {
             { param($FilePath,$Arguments) Invoke-SafeProcess -FilePath $FilePath -Arguments $Arguments }
         }
-        try { $processResult = & $invoker $descriptor.Command @($descriptor.Arguments) }
+        $processArguments = [string[]]@($descriptor.Arguments | ForEach-Object { [string]$_ })
+        try { $processResult = & $invoker $descriptor.Command $processArguments }
         catch { return New-VerificationResult $Id 'FAIL' 'VERIFICATION_PROCESS_EXCEPTION' $_.Exception.Message $ExpectedVersion $null }
         $typedProcessResult = $null -ne $processResult -and $processResult -isnot [bool] -and $processResult -isnot [string]
         if ($typedProcessResult) {
@@ -105,7 +115,8 @@ function Invoke-VerificationId {
     if ($null -eq $ProbeHandlers -or -not $ProbeHandlers.Contains($descriptor.Handler) -or $ProbeHandlers[$descriptor.Handler] -isnot [scriptblock]) {
         return New-VerificationResult $Id 'NOT_READY' 'VERIFICATION_HANDLER_MISSING' $null $null $null
     }
-    try { $probeResult = & $ProbeHandlers[$descriptor.Handler] $descriptor }
+    $handlerDescriptor = Copy-VerificationDescriptor $descriptor
+    try { $probeResult = & $ProbeHandlers[$descriptor.Handler] $handlerDescriptor }
     catch { return New-VerificationResult $Id 'FAIL' 'VERIFICATION_PROBE_EXCEPTION' $_.Exception.Message $null $null }
     if ($probeResult -is [bool]) {
         if (-not $probeResult) { return New-VerificationResult $Id 'FAIL' 'VERIFICATION_PROBE_FAILED' $null $null $null }

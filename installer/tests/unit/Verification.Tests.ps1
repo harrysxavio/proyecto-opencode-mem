@@ -76,4 +76,37 @@ Describe 'closed verification registry' {
         (Invoke-VerificationId -Id 'graphify.query' -ProbeHandlers @{ 'graphify.query' = { 'yes' } }).ErrorCode | Should -Be 'VERIFICATION_RESULT_INVALID'
         (Invoke-VerificationId -Id 'graphify.query' -ProbeHandlers @{ 'graphify.query' = { throw 'boom' } }).ErrorCode | Should -Be 'VERIFICATION_PROBE_EXCEPTION'
     }
+
+    It 'keeps functional descriptors canonical across hostile handler mutation' {
+        $first = Invoke-VerificationId -Id 'engram.persist' -ProbeHandlers @{ 'engram.persist' = {
+            param($Descriptor)
+            $Descriptor.Id = 'mutated'; $Descriptor.Handler = 'mutated'; $Descriptor.Arguments += 'danger'
+            [pscustomobject]@{ Success=$true }
+        } }
+        $secondDescriptor = $null
+        $second = Invoke-VerificationId -Id 'engram.persist' -ProbeHandlers @{ 'engram.persist' = {
+            param($Descriptor) $script:secondDescriptor = $Descriptor; [pscustomobject]@{ Success=$true }
+        } }
+        $first.Status | Should -Be 'PASS'
+        $second.Status | Should -Be 'PASS'
+        $script:secondDescriptor.Id | Should -Be 'engram.persist'
+        $script:secondDescriptor.Handler | Should -Be 'engram.persist'
+        @($script:secondDescriptor.Arguments).Count | Should -Be 0
+    }
+
+    It 'returns fresh argument arrays and does not share them with process callbacks' {
+        $firstRegistry = @(Get-VerificationRegistry)
+        ($firstRegistry | Where-Object Id -EQ 'git.version').Arguments[0] = 'mutated'
+        $secondRegistry = @(Get-VerificationRegistry)
+        ($secondRegistry | Where-Object Id -EQ 'git.version').Arguments | Should -Be @('--version')
+
+        Invoke-VerificationId -Id 'git.version' -ExpectedVersion '2.53.0' -ProcessInvoker {
+            param($FilePath,$Arguments) $Arguments[0]='mutated'; [pscustomobject]@{ ExitCode=0; StdOut='2.53.0'; StdErr='' }
+        } | Out-Null
+        $script:observedArguments = $null
+        Invoke-VerificationId -Id 'git.version' -ExpectedVersion '2.53.0' -ProcessInvoker {
+            param($FilePath,$Arguments) $script:observedArguments=@($Arguments); [pscustomobject]@{ ExitCode=0; StdOut='2.53.0'; StdErr='' }
+        } | Out-Null
+        $script:observedArguments | Should -Be @('--version')
+    }
 }
