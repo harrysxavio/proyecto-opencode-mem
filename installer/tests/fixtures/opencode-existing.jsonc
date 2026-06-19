@@ -1,0 +1,12 @@
+{
+  // User-owned MCP must survive composition.
+  "mcp": {
+    "custom": {
+      "command": ["custom-server", "https://example.test/a//b"],
+    },
+  },
+  /* Comments and trailing commas are valid OpenCode JSONC. */
+  "agent": { "reviewer": { "prompt": "keep /* literal */ and escaped quote: \"ok\" \\ path" } },
+  "plugin": ["user-plugin"],
+  "instructions": ["USER.md"],
+}
