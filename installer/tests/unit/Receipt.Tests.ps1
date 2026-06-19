@@ -93,6 +93,20 @@ Describe 'receipt persistence and ownership' {
         $receipt.ownedPaths | Should -Contain ([IO.Path]::GetFullPath((Join-Path $allowed 'created.txt')))
     }
 
+    It 'rejects a junction-backed backup root before creating its outside container' {
+        $allowed = Join-Path $TestDrive 'junction-source'; New-Item -ItemType Directory $allowed -Force | Out-Null
+        $source = Join-Path $allowed 'source.txt'; 'original' | Set-Content $source
+        $outside = Join-Path $TestDrive 'junction-backup-outside'; New-Item -ItemType Directory $outside -Force | Out-Null
+        $backupRoot = Join-Path $TestDrive 'backup-junction'
+        try { New-Item -ItemType Junction -Path $backupRoot -Target $outside -ErrorAction Stop | Out-Null }
+        catch { Set-ItResult -Skipped -Because 'Junction creation is unavailable'; return }
+        $outsideContainer = Join-Path $outside '20260618T123456Z-a1b2c3d4'
+
+        { Backup-InstallPath -Receipt (New-TestReceipt) -Path $source -BackupRoot $backupRoot -BackupId '20260618T123456Z-a1b2c3d4' -AllowedRoots @($allowed) } |
+            Should -Throw 'ROLLBACK_PATH_OUTSIDE_OWNERSHIP*'
+        Test-Path -LiteralPath $outsideContainer | Should -BeFalse
+    }
+
     It 'finds the first component not yet verified for resume' {
         $receipt = New-TestReceipt
         Set-ReceiptComponentState $receipt 'one' 'VERIFIED'

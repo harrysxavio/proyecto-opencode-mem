@@ -212,10 +212,16 @@ function Backup-InstallPath {
             $reparse = @(Get-ChildItem -LiteralPath $full -Force -Recurse | Where-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 })
             if ($reparse.Count -gt 0) { throw "ROLLBACK_PATH_OUTSIDE_OWNERSHIP:$($reparse[0].FullName)" }
         }
-        $container = Join-Path ([IO.Path]::GetFullPath($BackupRoot)) $BackupId
-        New-Item -ItemType Directory -Path $container -Force | Out-Null
+        $fullBackupRoot = [IO.Path]::GetFullPath($BackupRoot)
+        Assert-NoReparsePoint -Path $fullBackupRoot -StopRoots @()
+        if ((Test-Path -LiteralPath $fullBackupRoot) -and -not (Test-Path -LiteralPath $fullBackupRoot -PathType Container)) {
+            throw "ROLLBACK_PATH_OUTSIDE_OWNERSHIP:$BackupRoot"
+        }
+        $container = Join-Path $fullBackupRoot $BackupId
         $backupPath = Join-Path $container ('item-' + @($Receipt.backups).Count.ToString('D8'))
+        [void](Assert-OwnedPath -Path $container -AllowedRoots @($fullBackupRoot) -AllowMissing)
         [void](Assert-OwnedPath -Path $backupPath -AllowedRoots @($BackupRoot) -AllowMissing)
+        New-Item -ItemType Directory -Path $container -Force | Out-Null
         Copy-Item -LiteralPath $full -Destination $backupPath -Recurse -Force
     }
     $record = [pscustomobject][ordered]@{ path = $full; backupPath = $backupPath; existed = [bool]$exists; type = $type }

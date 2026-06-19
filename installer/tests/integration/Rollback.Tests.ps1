@@ -63,6 +63,25 @@ Describe 'safe rollback' {
         (Get-Content $two -Raw).Trim() | Should -Be 'new2'
     }
 
+    It 'rejects a target ancestor of protected receipt and backup paths before any action' {
+        $settings = Join-Path $configRoot 'settings.json'; 'before' | Set-Content $settings -NoNewline
+        Backup-InstallPath $receipt $settings $backupRoot '20260618T123456Z-a1b2c3d4' @($configRoot)
+        'after' | Set-Content $settings -NoNewline
+        $credential = Join-Path $configRoot 'credentials.json'; 'credential-stays' | Set-Content $credential -NoNewline
+        $unrelated = Join-Path $configRoot 'unrelated.txt'; 'unrelated-stays' | Set-Content $unrelated -NoNewline
+        $receipt.ownedPaths = @($configRoot)
+        Save-InstallReceipt $receipt $receiptPath $receiptRoot
+        $backupSource = $receipt.backups[0].backupPath
+
+        { & $rollbackCommand -ReceiptPath $receiptPath -ReceiptRoot $receiptRoot -AllowedRoots @($configRoot) -BackupRoot $backupRoot -NonInteractive -ConfirmRollback } |
+            Should -Throw 'ROLLBACK_PATH_CONFLICT*'
+        (Get-Content $settings -Raw) | Should -Be 'after'
+        (Get-Content $credential -Raw) | Should -Be 'credential-stays'
+        (Get-Content $unrelated -Raw) | Should -Be 'unrelated-stays'
+        Test-Path -LiteralPath $backupSource | Should -BeTrue
+        Test-Path -LiteralPath $receiptPath | Should -BeTrue
+    }
+
     It 'emits one JSON document without auxiliary pipeline output' {
         Save-InstallReceipt $receipt $receiptPath $receiptRoot
         $output = @(& $rollbackCommand -ReceiptPath $receiptPath -ReceiptRoot $receiptRoot -AllowedRoots @($configRoot) -BackupRoot $backupRoot -NonInteractive -ConfirmRollback -Json)
