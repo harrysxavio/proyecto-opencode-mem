@@ -91,19 +91,21 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 ### 2026-06-18 — Task 4
 
 - Status: `completed`.
-- Commits: inicio `01f8acf`; implementación `49cb141`.
+- Commits: inicio `01f8acf`; implementación `49cb141`; remediación de seguridad `77bab38`.
 - Tests:
   - TDD RED inicial: `0/12` passed; `12/12` fallaron por módulo y comando ausentes.
   - TDD RED forwarding: `8/9` passed; `1/9` falló por parámetros de rollback aún ausentes.
   - TDD RED checkpoint: `7/8` passed; `1/8` falló por API de checkpoint aún ausente.
   - TDD GREEN focalizado: `17/17`.
-  - `pnpm test:powershell`: `71/71`.
+  - Spec remediation RED: `13/15` passed; `2/15` fallaron al reproducir creación vía junction y solapamiento destructivo source/target.
+  - Spec remediation GREEN: `15/15`.
+  - `pnpm test:powershell`: `73/73`.
   - `pnpm test:all`: `109/109`.
   - `pnpm docs:check`: `PASS`.
   - `git diff --check`: `PASS`.
 - Reviews:
   - Self-review: `APPROVED`.
-  - Spec: `PENDING`.
+  - Spec: `PENDING RE-REVIEW` tras remediar prevalidación de `BackupRoot` y conflictos globales del plan de rollback.
   - Quality: `PENDING`.
 
 ## Decisiones
