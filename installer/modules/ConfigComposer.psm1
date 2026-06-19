@@ -387,6 +387,20 @@ function Get-ConfigMutexName {
     return 'Local\CodexKit.Config.' + $hash
 }
 
+function Get-NearestExistingConfigDirectory {
+    param([Parameter(Mandatory)][string]$Path)
+    $candidate = [IO.Path]::GetFullPath($Path)
+    while (-not (Test-Path -LiteralPath $candidate)) {
+        $parent = [IO.Path]::GetDirectoryName($candidate)
+        if (-not $parent -or $parent -eq $candidate) { throw "CONFIG_PATH_OUTSIDE_ROOT:$Path" }
+        $candidate = $parent
+    }
+    if (-not (Test-Path -LiteralPath $candidate -PathType Container)) { throw "CONFIG_PATH_OUTSIDE_ROOT:$Path" }
+    $item = Get-Item -LiteralPath $candidate -Force
+    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "CONFIG_PATH_OUTSIDE_ROOT:$Path" }
+    return $candidate
+}
+
 function Enter-ConfigDirectoryLocks {
     param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$Parent)
     if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { throw 'CONFIG_DIRECTORY_LOCK_UNAVAILABLE:platform' }
@@ -473,52 +487,59 @@ function Write-OpenCodeConfig {
     )
     $fullPath = Assert-ConfigPath -Path $ConfigPath -Root $OpenCodeConfigRoot
     $parent = [IO.Path]::GetDirectoryName($fullPath)
-    New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    $exists = Test-Path -LiteralPath $fullPath -PathType Leaf
+    if ((Test-Path -LiteralPath $fullPath) -and -not $exists) { throw "CONFIG_PATH_OUTSIDE_ROOT:$ConfigPath" }
+    $originalBytes = if ($exists) { [IO.File]::ReadAllBytes($fullPath) } else { $null }
+    $existingText = if ($exists) { [IO.File]::ReadAllText($fullPath, [Text.Encoding]::UTF8) } else { '{}' }
+    $merge = Merge-OpenCodeConfig -ExistingText $existingText -Owned $Owned
+    $receiptCopy = Copy-ValidatedInstallReceipt $Receipt
+    Add-ReceiptOwnedPath -Receipt $receiptCopy -Path $fullPath
+    foreach ($key in $merge.OwnedKeys) { Add-ReceiptOwnedKey -Receipt $receiptCopy -Key $key }
+    [void](Assert-InstallReceipt $receiptCopy)
+    if (-not $merge.Changed) { return Add-ReceiptToMergeResult -Merge $merge -Receipt $receiptCopy }
+
+    $anchor = Get-NearestExistingConfigDirectory $OpenCodeConfigRoot
     $mutex = [Threading.Mutex]::new($false, (Get-ConfigMutexName $fullPath))
     $mutexAcquired = $false
     try {
         try { $mutexAcquired = $mutex.WaitOne([timespan]::FromSeconds(30)) }
         catch [Threading.AbandonedMutexException] { $mutexAcquired = $true }
         if (-not $mutexAcquired) { throw 'CONFIG_LOCK_TIMEOUT' }
-        $locks = Enter-ConfigDirectoryLocks -Root ([IO.Path]::GetFullPath($OpenCodeConfigRoot)) -Parent $parent
+        $anchorLocks = Enter-ConfigDirectoryLocks -Root $anchor -Parent $anchor
         try {
-            [void](Assert-ConfigPath -Path $fullPath -Root $OpenCodeConfigRoot)
-            Assert-ConfigDirectoryLocksCurrent $locks
-            $exists = Test-Path -LiteralPath $fullPath -PathType Leaf
-            if ((Test-Path -LiteralPath $fullPath) -and -not $exists) { throw "CONFIG_PATH_OUTSIDE_ROOT:$ConfigPath" }
-            $originalBytes = if ($exists) { [IO.File]::ReadAllBytes($fullPath) } else { $null }
-            $existingText = if ($exists) { [IO.File]::ReadAllText($fullPath, [Text.Encoding]::UTF8) } else { '{}' }
-            $merge = Merge-OpenCodeConfig -ExistingText $existingText -Owned $Owned
-            $receiptCopy = Copy-ValidatedInstallReceipt $Receipt
-            Add-ReceiptOwnedPath -Receipt $receiptCopy -Path $fullPath
-            foreach ($key in $merge.OwnedKeys) { Add-ReceiptOwnedKey -Receipt $receiptCopy -Key $key }
-            [void](Assert-InstallReceipt $receiptCopy)
-            if (-not $merge.Changed) { return Add-ReceiptToMergeResult -Merge $merge -Receipt $receiptCopy }
-
-            if ($PSBoundParameters.ContainsKey('BeforePublishValidation')) {
-                try { & $BeforePublishValidation }
-                catch { throw "CONFIG_CONCURRENT_MODIFICATION:$($_.Exception.Message)" }
-            }
-            Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes
-
-            $backupParameters = @{ Receipt = $receiptCopy; Path = $fullPath; BackupRoot = $BackupRoot; BackupId = $BackupId; AllowedRoots = @($OpenCodeConfigRoot) }
-            if ($PSBoundParameters.ContainsKey('BackupCopyOperation')) { $backupParameters.CopyOperation = $BackupCopyOperation }
-            [void](Backup-InstallPath @backupParameters)
-            [void](Assert-InstallReceipt $receiptCopy)
-            Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes
-
-            $temp = Join-Path $parent ('.' + [IO.Path]::GetFileName($fullPath) + '.' + [guid]::NewGuid().ToString('N') + '.tmp')
+            Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $anchorLocks -OriginalBytes $originalBytes
+            New-Item -ItemType Directory -Path $parent -Force | Out-Null
+            Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $anchorLocks -OriginalBytes $originalBytes
+            $locks = Enter-ConfigDirectoryLocks -Root ([IO.Path]::GetFullPath($OpenCodeConfigRoot)) -Parent $parent
             try {
-                if ($PSBoundParameters.ContainsKey('AtomicWriteOperation')) { & $AtomicWriteOperation $temp $fullPath $merge.Json }
-                else { [IO.File]::WriteAllText($temp, $merge.Json, [Text.UTF8Encoding]::new($false)) }
                 Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes
-                if (-not (Test-Path -LiteralPath $temp -PathType Leaf)) { throw 'CONFIG_ATOMIC_TEMP_MISSING' }
-                [IO.File]::Move($temp, $fullPath, $true)
+
+                if ($PSBoundParameters.ContainsKey('BeforePublishValidation')) {
+                    try { & $BeforePublishValidation }
+                    catch { throw "CONFIG_CONCURRENT_MODIFICATION:$($_.Exception.Message)" }
+                }
+                Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes
+
+                $backupParameters = @{ Receipt = $receiptCopy; Path = $fullPath; BackupRoot = $BackupRoot; BackupId = $BackupId; AllowedRoots = @($OpenCodeConfigRoot) }
+                if ($PSBoundParameters.ContainsKey('BackupCopyOperation')) { $backupParameters.CopyOperation = $BackupCopyOperation }
+                [void](Backup-InstallPath @backupParameters)
+                [void](Assert-InstallReceipt $receiptCopy)
+                Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes
+
+                $temp = Join-Path $parent ('.' + [IO.Path]::GetFileName($fullPath) + '.' + [guid]::NewGuid().ToString('N') + '.tmp')
+                try {
+                    if ($PSBoundParameters.ContainsKey('AtomicWriteOperation')) { & $AtomicWriteOperation $temp $fullPath $merge.Json }
+                    else { [IO.File]::WriteAllText($temp, $merge.Json, [Text.UTF8Encoding]::new($false)) }
+                    Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes
+                    if (-not (Test-Path -LiteralPath $temp -PathType Leaf)) { throw 'CONFIG_ATOMIC_TEMP_MISSING' }
+                    [IO.File]::Move($temp, $fullPath, $true)
+                }
+                finally { if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Force } }
+                return Add-ReceiptToMergeResult -Merge $merge -Receipt $receiptCopy
             }
-            finally { if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Force } }
-            return Add-ReceiptToMergeResult -Merge $merge -Receipt $receiptCopy
+            finally { foreach ($entry in $locks) { $entry.Handle.Dispose() } }
         }
-        finally { foreach ($entry in $locks) { $entry.Handle.Dispose() } }
+        finally { foreach ($entry in $anchorLocks) { $entry.Handle.Dispose() } }
     }
     finally {
         if ($mutexAcquired) { $mutex.ReleaseMutex() }

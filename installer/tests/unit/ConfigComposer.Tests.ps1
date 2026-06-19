@@ -174,6 +174,27 @@ Describe 'Write-OpenCodeConfig' {
         }
     }
 
+    It 'performs all owned and receipt validation before creating an absent root or parent' {
+        $absentRoot = Join-Path $TestDrive ('absent-root-' + [guid]::NewGuid().ToString('N'))
+        $nestedPath = Join-Path $absentRoot 'nested/opencode.jsonc'
+        $absentBackup = Join-Path $TestDrive ('absent-backup-' + [guid]::NewGuid().ToString('N'))
+
+        $invalidReceipt = New-TestReceipt
+        $invalidReceipt.PSObject.Properties.Remove('ownedPaths')
+        { Write-OpenCodeConfig $nestedPath $absentRoot (New-EngramOwned) $invalidReceipt $absentBackup $backupId } |
+            Should -Throw 'RECEIPT_*'
+        Test-Path $absentRoot | Should -BeFalse
+        Test-Path $nestedPath | Should -BeFalse
+        Test-Path $absentBackup | Should -BeFalse
+
+        $invalidOwned = [ordered]@{ unexpected = [ordered]@{ value = $true } }
+        { Write-OpenCodeConfig $nestedPath $absentRoot $invalidOwned (New-TestReceipt) $absentBackup $backupId } |
+            Should -Throw 'CONFIG_OWNED_KEY_INVALID*'
+        Test-Path $absentRoot | Should -BeFalse
+        Test-Path $nestedPath | Should -BeFalse
+        Test-Path $absentBackup | Should -BeFalse
+    }
+
     It 'does not back up or write on collision and leaves the original unchanged' {
         $original = '{"mcp":{"engram":{"enabled":false}}}'
         [IO.File]::WriteAllText($path, $original)
