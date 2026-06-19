@@ -115,7 +115,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 ### 2026-06-18 — Task 5
 
 - Status: `completed`.
-- Commits: inicio `e29b5ca`; implementación `24d4ab0`; remediación Spec `8193dc7`; hardening Quality `2caa3b9`; regresión absent-root `4266584`.
+- Commits: inicio `e29b5ca`; implementación `24d4ab0`; remediación Spec `8193dc7`; hardening Quality `2caa3b9`; regresión absent-root `4266584`; CAS final `00cd76a`.
 - Tests:
   - TDD RED inicial: `0/13` passed; `13/13` fallaron por módulo y funciones ausentes.
   - TDD GREEN base: `13/13`.
@@ -129,7 +129,9 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
   - Quality hardening GREEN: `24/24` con tokens numéricos raw, canonicalización BigInteger, diccionarios ordinales y locks/revalidación fail-closed.
   - Spec absent-root RED: `24/25` passed; un receipt inválido creaba el root antes de fallar.
   - Spec absent-root GREEN: `25/25` con validación pura previa y lock del ancestro existente más cercano.
-  - `pnpm test:powershell`: `103/103`.
+  - Quality final RED: `25/29` passed; faltaban prevalidación BackupId, creación segmentada y CAS/restore post-replace.
+  - Quality final GREEN: `29/29` con handles por segmento y publicación CAS que preserva al último escritor.
+  - `pnpm test:powershell`: `107/107`.
   - `pnpm test:all`: `109/109`.
   - `pnpm docs:check`: `PASS`.
   - `git diff --check`: `PASS`.
