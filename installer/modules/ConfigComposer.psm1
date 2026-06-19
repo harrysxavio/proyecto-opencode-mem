@@ -423,7 +423,7 @@ function Enter-ConfigDirectoryLocks {
     try {
         foreach ($path in @($Root, $Parent) | Select-Object -Unique) {
             if (-not (Test-Path -LiteralPath $path -PathType Container)) { throw "CONFIG_DIRECTORY_LOCK_UNAVAILABLE:$path" }
-            $identity = (Resolve-Path -LiteralPath $path).Path
+            $identity = if ($OpenReparsePoint) { [IO.Path]::GetFullPath($path) } else { (Resolve-Path -LiteralPath $path).Path }
             $flags = 0x02000000
             if ($OpenReparsePoint) { $flags = $flags -bor 0x00200000 }
             $handle = [CodexKit.Config.NativeDirectoryLock]::CreateFileW(
@@ -432,7 +432,17 @@ function Enter-ConfigDirectoryLocks {
                 if ($null -ne $handle) { $handle.Dispose() }
                 throw "CONFIG_DIRECTORY_LOCK_UNAVAILABLE:${path}:$([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
             }
-            $result.Add([pscustomobject]@{ Path = [IO.Path]::GetFullPath($path); Identity = $identity; Handle = $handle })
+            $information = [CodexKit.Config.NativeDirectoryLock+FileInformation]::new()
+            if (-not [CodexKit.Config.NativeDirectoryLock]::GetFileInformationByHandle($handle, [ref]$information)) {
+                $handle.Dispose()
+                throw "CONFIG_DIRECTORY_LOCK_UNAVAILABLE:${path}:$([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+            }
+            if (($information.Attributes -band 0x400) -ne 0) {
+                $handle.Dispose()
+                throw "CONFIG_CONCURRENT_MODIFICATION:directory handle is reparse:$path"
+            }
+            $fileIdentity = '{0:x8}:{1:x8}:{2:x8}' -f $information.VolumeSerialNumber, $information.FileIndexHigh, $information.FileIndexLow
+            $result.Add([pscustomobject]@{ Path = [IO.Path]::GetFullPath($path); Identity = $identity; FileIdentity = $fileIdentity; Handle = $handle })
         }
         return ,$result.ToArray()
     }
@@ -442,11 +452,29 @@ function Enter-ConfigDirectoryLocks {
     }
 }
 
+function Get-ConfigDirectoryIdentitySnapshot {
+    param([Parameter(Mandatory)][string]$Path)
+    $full = [IO.Path]::GetFullPath($Path)
+    $handle = [CodexKit.Config.NativeDirectoryLock]::CreateFileW($full, 0, 7, [IntPtr]::Zero, 3, 0x02200000, [IntPtr]::Zero)
+    if ($null -eq $handle -or $handle.IsInvalid) {
+        if ($null -ne $handle) { $handle.Dispose() }
+        throw "CONFIG_DIRECTORY_LOCK_UNAVAILABLE:$Path"
+    }
+    try {
+        $information = [CodexKit.Config.NativeDirectoryLock+FileInformation]::new()
+        if (-not [CodexKit.Config.NativeDirectoryLock]::GetFileInformationByHandle($handle, [ref]$information)) { throw 'CONFIG_DIRECTORY_LOCK_UNAVAILABLE:identity' }
+        if (($information.Attributes -band 0x400) -ne 0) { throw "CONFIG_PATH_OUTSIDE_ROOT:$Path" }
+        return '{0:x8}:{1:x8}:{2:x8}' -f $information.VolumeSerialNumber, $information.FileIndexHigh, $information.FileIndexLow
+    }
+    finally { $handle.Dispose() }
+}
+
 function New-SafeConfigDirectoryPath {
     param(
         [Parameter(Mandatory)][string]$Anchor,
         [Parameter(Mandatory)][string]$Target,
-        [scriptblock]$BeforeDescendantCreation
+        [scriptblock]$BeforeDescendantCreation,
+        [scriptblock]$AfterDescendantPrecheck
     )
     $relative = [IO.Path]::GetRelativePath($Anchor, $Target)
     if ($relative -eq '.' ) { return ,@() }
@@ -461,7 +489,17 @@ function New-SafeConfigDirectoryPath {
             if (-not (Test-Path -LiteralPath $next -PathType Container)) { throw "CONFIG_PATH_OUTSIDE_ROOT:$next" }
             $item = Get-Item -LiteralPath $next -Force
             if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "CONFIG_PATH_OUTSIDE_ROOT:$next" }
-            foreach ($entry in (Enter-ConfigDirectoryLocks -Root $next -Parent $next -OpenReparsePoint)) { $held.Add($entry) }
+            $expectedIdentity = Get-ConfigDirectoryIdentitySnapshot $next
+            if ($null -ne $AfterDescendantPrecheck) { & $AfterDescendantPrecheck $next }
+            try { $opened = Enter-ConfigDirectoryLocks -Root $next -Parent $next -OpenReparsePoint }
+            catch { throw "CONFIG_CONCURRENT_MODIFICATION:$($_.Exception.Message)" }
+            foreach ($entry in $opened) {
+                if ($entry.FileIdentity -cne $expectedIdentity) {
+                    $entry.Handle.Dispose()
+                    throw "CONFIG_CONCURRENT_MODIFICATION:directory identity changed:$next"
+                }
+                $held.Add($entry)
+            }
             $current = $next
         }
         return ,$held.ToArray()
@@ -555,6 +593,7 @@ function Write-OpenCodeConfig {
         [scriptblock]$AtomicWriteOperation,
         [Alias('BeforePublishOperation','PrePublishOperation')][scriptblock]$BeforePublishValidation,
         [scriptblock]$BeforeDescendantCreation,
+        [scriptblock]$AfterDescendantPrecheck,
         [Alias('ImmediatelyBeforePublish')][scriptblock]$BeforeAtomicPublish,
         [Alias('AfterAtomicPublish')][scriptblock]$AfterAtomicPublishValidation
     )
@@ -583,7 +622,7 @@ function Write-OpenCodeConfig {
         $anchorLocks = Enter-ConfigDirectoryLocks -Root $anchor -Parent $anchor
         try {
             Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $anchorLocks -OriginalBytes $originalBytes -OriginalIdentity $originalIdentity
-            $segmentLocks = New-SafeConfigDirectoryPath -Anchor $anchor -Target $parent -BeforeDescendantCreation $BeforeDescendantCreation
+            $segmentLocks = New-SafeConfigDirectoryPath -Anchor $anchor -Target $parent -BeforeDescendantCreation $BeforeDescendantCreation -AfterDescendantPrecheck $AfterDescendantPrecheck
             $locks = @($anchorLocks) + @($segmentLocks)
             try {
                 Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes -OriginalIdentity $originalIdentity

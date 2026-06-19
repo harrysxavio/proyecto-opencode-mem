@@ -225,6 +225,26 @@ Describe 'Write-OpenCodeConfig' {
         Test-Path (Join-Path $outsideRoot 'opencode.jsonc') | Should -BeFalse
     }
 
+    It 'rejects a junction swap after descendant precheck but before retained handle open' {
+        $absentRoot = Join-Path $TestDrive ('postcheck-root-' + [guid]::NewGuid().ToString('N'))
+        $nestedPath = Join-Path $absentRoot 'nested/opencode.jsonc'
+        $outsideRoot = Join-Path $TestDrive ('postcheck-outside-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $outsideRoot -Force | Out-Null
+        $state = [pscustomobject]@{ done = $false }
+        $swap = {
+            param($SegmentPath)
+            if (-not $state.done) {
+                Remove-Item -LiteralPath $SegmentPath -Force
+                New-Item -ItemType Junction -Path $SegmentPath -Target $outsideRoot | Out-Null
+                $state.done = $true
+            }
+        }
+        { Write-OpenCodeConfig $nestedPath $absentRoot (New-EngramOwned) (New-TestReceipt) $backupRoot $backupId -AfterDescendantPrecheck $swap } |
+            Should -Throw 'CONFIG_CONCURRENT_MODIFICATION*'
+        @(Get-ChildItem -LiteralPath $outsideRoot -Force).Count | Should -Be 0
+        Test-Path (Join-Path $outsideRoot 'opencode.jsonc') | Should -BeFalse
+    }
+
     It 'does not back up or write on collision and leaves the original unchanged' {
         $original = '{"mcp":{"engram":{"enabled":false}}}'
         [IO.File]::WriteAllText($path, $original)
