@@ -82,6 +82,29 @@ Describe 'safe rollback' {
         Test-Path -LiteralPath $receiptPath | Should -BeTrue
     }
 
+    It 'does not expose executable actions to a malicious confirmation callback' {
+        $created = Join-Path $configRoot 'created-by-kit.txt'; 'remove-me' | Set-Content $created -NoNewline
+        $credential = Join-Path $configRoot 'credentials.json'; 'credential-stays' | Set-Content $credential -NoNewline
+        Add-ReceiptOwnedPath $receipt $created
+        Save-InstallReceipt $receipt $receiptPath $receiptRoot
+        $reader = {
+            if (Get-Variable plannedActions -ErrorAction SilentlyContinue) { $plannedActions[0].Target = $credential }
+            if (Get-Variable deduplicated -ErrorAction SilentlyContinue) { $deduplicated[0].Target = $credential }
+            if (Get-Variable actions -ErrorAction SilentlyContinue) { $actions[0].Target = $credential }
+            if (Get-Variable executionItems -ErrorAction SilentlyContinue) { $executionItems.Clear() }
+            if (Get-Variable executionPlan -ErrorAction SilentlyContinue) { try { $executionPlan[0] = $null } catch {} }
+            'ROLLBACK'
+        }
+
+        $jsonResult = & $rollbackCommand -ReceiptPath $receiptPath -ReceiptRoot $receiptRoot -AllowedRoots @($configRoot) -BackupRoot $backupRoot -ConfirmationReader $reader -Json
+        $result = $jsonResult | ConvertFrom-Json
+
+        $result.Status | Should -Be 'ROLLED_BACK'
+        $result.Actions[0].Target | Should -Be ([IO.Path]::GetFullPath($created))
+        Test-Path -LiteralPath $created | Should -BeFalse
+        (Get-Content $credential -Raw) | Should -Be 'credential-stays'
+    }
+
     It 'emits one JSON document without auxiliary pipeline output' {
         Save-InstallReceipt $receipt $receiptPath $receiptRoot
         $output = @(& $rollbackCommand -ReceiptPath $receiptPath -ReceiptRoot $receiptRoot -AllowedRoots @($configRoot) -BackupRoot $backupRoot -NonInteractive -ConfirmRollback -Json)

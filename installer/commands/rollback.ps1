@@ -29,6 +29,13 @@ function Test-OverlappingPath {
     (Test-SameOrAncestorPath $Left $Right) -or (Test-SameOrAncestorPath $Right $Left)
 }
 
+function ConvertTo-RollbackActionDto {
+    param([Parameter(Mandatory)][Collections.IEnumerable]$Plan)
+    foreach ($item in $Plan) {
+        [pscustomobject][ordered]@{ Kind = $item.Item1; Target = $item.Item2; Source = $item.Item3; Type = $item.Item4 }
+    }
+}
+
 if ($receipt.state -ceq 'ROLLED_BACK') {
     $result = [pscustomobject][ordered]@{ Status = 'ALREADY_ROLLED_BACK'; Actions = @(); ReceiptPath = [IO.Path]::GetFullPath($ReceiptPath) }
     if ($Json) { Write-Output -NoEnumerate ($result | ConvertTo-Json -Depth 10 -Compress) } else { $result }
@@ -84,7 +91,12 @@ foreach ($action in $deduplicated) {
         if (Test-SameOrAncestorPath $action.Target $allowedRoot) { throw "ROLLBACK_PATH_CONFLICT:$($action.Target)" }
     }
 }
-$plannedActions = [Collections.ObjectModel.ReadOnlyCollection[object]]::new($deduplicated.ToArray())
+$executionItems = [Collections.Generic.List[Tuple[string,string,string,string]]]::new()
+foreach ($action in $deduplicated) {
+    $sourceValue = if ($null -eq $action.Source) { $null } else { [string]$action.Source }
+    [void]$executionItems.Add([Tuple[string,string,string,string]]::new([string]$action.Kind, [string]$action.Target, $sourceValue, [string]$action.Type))
+}
+$executionPlan = [Collections.ObjectModel.ReadOnlyCollection[Tuple[string,string,string,string]]]::new($executionItems.ToArray())
 
 if ($NonInteractive) {
     if (-not $ConfirmRollback) { throw 'ROLLBACK_CONFIRMATION_REQUIRED: pass -ConfirmRollback' }
@@ -92,25 +104,28 @@ if ($NonInteractive) {
 else {
     $answer = if ($PSBoundParameters.ContainsKey('ConfirmationReader')) { & $ConfirmationReader } else { Read-Host 'Type ROLLBACK to continue' }
     if ($answer -cne 'ROLLBACK') {
-        $result = [pscustomobject][ordered]@{ Status = 'CANCELED'; Actions = @($plannedActions); ReceiptPath = [IO.Path]::GetFullPath($ReceiptPath) }
+        $result = [pscustomobject][ordered]@{ Status = 'CANCELED'; Actions = @(ConvertTo-RollbackActionDto $executionPlan); ReceiptPath = [IO.Path]::GetFullPath($ReceiptPath) }
         if ($Json) { Write-Output -NoEnumerate ($result | ConvertTo-Json -Depth 10 -Compress) } else { $result }
         return
     }
 }
 
-foreach ($action in $plannedActions) {
-    if ($action.Kind -eq 'RESTORE') {
-        if (Test-Path -LiteralPath $action.Target) { Remove-Item -LiteralPath $action.Target -Recurse -Force }
-        $parent = [IO.Path]::GetDirectoryName($action.Target)
+foreach ($action in $executionPlan) {
+    $kind = $action.Item1
+    $target = $action.Item2
+    $source = $action.Item3
+    if ($kind -eq 'RESTORE') {
+        if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
+        $parent = [IO.Path]::GetDirectoryName($target)
         if ($parent) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
-        Copy-Item -LiteralPath $action.Source -Destination $action.Target -Recurse -Force
+        Copy-Item -LiteralPath $source -Destination $target -Recurse -Force
     }
-    elseif (Test-Path -LiteralPath $action.Target) {
-        Remove-Item -LiteralPath $action.Target -Recurse -Force
+    elseif (Test-Path -LiteralPath $target) {
+        Remove-Item -LiteralPath $target -Recurse -Force
     }
 }
 
 $receipt.state = 'ROLLED_BACK'
 Save-InstallReceipt -Receipt $receipt -Path $ReceiptPath -ReceiptRoot $ReceiptRoot
-$result = [pscustomobject][ordered]@{ Status = 'ROLLED_BACK'; Actions = @($plannedActions); ReceiptPath = [IO.Path]::GetFullPath($ReceiptPath) }
+$result = [pscustomobject][ordered]@{ Status = 'ROLLED_BACK'; Actions = @(ConvertTo-RollbackActionDto $executionPlan); ReceiptPath = [IO.Path]::GetFullPath($ReceiptPath) }
 if ($Json) { Write-Output -NoEnumerate ($result | ConvertTo-Json -Depth 10 -Compress) } else { $result }
