@@ -22,7 +22,7 @@ Describe 'ConvertFrom-Jsonc' {
     It 'preserves JSON scalar, array, object, and null types' {
         $document = ConvertFrom-Jsonc '{"i":1,"n":1.25,"yes":true,"no":false,"nil":null,"a":[1,"x"],"o":{"x":2}}'
         $document.i | Should -BeOfType Int64
-        $document.n | Should -BeOfType Double
+        $document.n.ToString() | Should -Be '1.25'
         $document.yes | Should -BeTrue
         $document.no | Should -BeFalse
         $document.nil | Should -BeNullOrEmpty
@@ -60,6 +60,28 @@ Describe 'Merge-OpenCodeConfig' {
     It 'treats equivalent JSON numeric CLR representations as semantically equal' {
         $result = Merge-OpenCodeConfig '{"mcp":{"server":{"priority":1}}}' ([ordered]@{ mcp = [ordered]@{ server = [ordered]@{ priority = [int]1 } } })
         $result.Changed | Should -BeFalse
+        (Merge-OpenCodeConfig '{"mcp":{"server":{"priority":1.0}}}' ([ordered]@{ mcp = [ordered]@{ server = [ordered]@{ priority = [int]1 } } })).Changed | Should -BeFalse
+        (Merge-OpenCodeConfig '{"mcp":{"server":{"priority":1e100}}}' ([ordered]@{ mcp = [ordered]@{ server = [ordered]@{ priority = [double]1e100 } } })).Changed | Should -BeFalse
+        { Merge-OpenCodeConfig '{"mcp":{"server":{"priority":1e100}}}' ([ordered]@{ mcp = [ordered]@{ server = [ordered]@{ priority = [double]2e100 } } }) } |
+            Should -Throw 'CONFIG_COLLISION:mcp.server.priority'
+    }
+
+    It 'round trips unrelated large and high precision numeric tokens exactly' {
+        $existing = '{"mcp":{"custom":{"max":18446744073709551615,"huge":18446744073709551616,"precise":0.123456789012345678901234567890}}}'
+        $result = Merge-OpenCodeConfig $existing ([ordered]@{ agent = [ordered]@{ kit = [ordered]@{ enabled = $true } } })
+        $result.Json | Should -Match '18446744073709551615'
+        $result.Json | Should -Match '18446744073709551616'
+        $result.Json | Should -Match '0\.123456789012345678901234567890'
+    }
+
+    It 'preserves distinct JSON keys by ordinal case and matches owned paths case-sensitively' {
+        $existing = '{"mcp":{"Engram":{"enabled":false}},"MCP":{"user":true}}'
+        $result = Merge-OpenCodeConfig $existing ([ordered]@{ mcp = [ordered]@{ engram = [ordered]@{ enabled = $true } } })
+        $result.Document['MCP']['user'] | Should -BeTrue
+        $result.Document['mcp']['Engram']['enabled'] | Should -BeFalse
+        $result.Document['mcp']['engram']['enabled'] | Should -BeTrue
+        $roundTrip = ConvertFrom-Jsonc $result.Json
+        @($roundTrip.Keys) | Should -Be @('mcp', 'MCP')
     }
 
     It 'detects semantic collisions at the exact owned path' {
@@ -198,6 +220,30 @@ Describe 'Write-OpenCodeConfig' {
         $receipt.ownedKeys.Count | Should -Be 0
         $receipt.backups.Count | Should -Be 0
         @(Get-ChildItem $root -Filter '*.tmp' -Force).Count | Should -Be 0
+    }
+
+    It 'rejects a concurrent file content swap before backup and preserves the concurrent writer' {
+        $original = '{"mcp":{}}'; $concurrent = '{"mcp":{"concurrent":true}}'
+        [IO.File]::WriteAllText($path, $original)
+        $operation = { [IO.File]::WriteAllText($path, $concurrent) }
+        { Write-OpenCodeConfig $path $root (New-EngramOwned) $receipt $backupRoot $backupId -BeforePublishValidation $operation } |
+            Should -Throw 'CONFIG_CONCURRENT_MODIFICATION*'
+        [IO.File]::ReadAllText($path) | Should -Be $concurrent
+        $receipt.backups.Count | Should -Be 0
+        Test-Path $backupRoot | Should -BeFalse
+    }
+
+    It 'fails closed when a concurrent operation attempts to replace the locked config root' {
+        $outsideRoot = Join-Path $TestDrive ('swap-target-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $outsideRoot -Force | Out-Null
+        [IO.File]::WriteAllText($path, '{"mcp":{}}')
+        $operation = {
+            Remove-Item -LiteralPath $root -Recurse -Force
+            New-Item -ItemType Junction -Path $root -Target $outsideRoot | Out-Null
+        }
+        { Write-OpenCodeConfig $path $root (New-EngramOwned) $receipt $backupRoot $backupId -BeforePublishValidation $operation } |
+            Should -Throw 'CONFIG_CONCURRENT_MODIFICATION*'
+        Test-Path (Join-Path $outsideRoot 'opencode.jsonc') | Should -BeFalse
     }
 
     It 'rejects lexical path escape before backup or write' {

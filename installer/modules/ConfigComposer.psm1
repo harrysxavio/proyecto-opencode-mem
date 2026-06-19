@@ -3,14 +3,40 @@ $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot 'Receipt.psm1')
 
+if (-not ('CodexKit.Config.JsonNumber' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
+namespace CodexKit.Config {
+    public sealed class JsonNumber {
+        public string Literal { get; }
+        public JsonNumber(string literal) { Literal = literal ?? throw new ArgumentNullException(nameof(literal)); }
+        public override string ToString() => Literal;
+    }
+
+    public static class NativeDirectoryLock {
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern SafeFileHandle CreateFileW(
+            string name, uint access, uint share, IntPtr security, uint creation, uint flags, IntPtr template);
+    }
+}
+'@
+}
+
 $script:AllowedRoots = @('mcp', 'agent', 'plugin', 'instructions')
 $script:ForbiddenNames = @('__proto__', 'constructor', 'prototype')
+
+function New-OrdinalDictionary {
+    [Collections.Specialized.OrderedDictionary]::new([StringComparer]::Ordinal)
+}
 
 function ConvertFrom-JsonElementValue {
     param([Parameter(Mandatory)][System.Text.Json.JsonElement]$Element)
     switch ($Element.ValueKind) {
         ([System.Text.Json.JsonValueKind]::Object) {
-            $result = [ordered]@{}
+            $result = New-OrdinalDictionary
             foreach ($property in $Element.EnumerateObject()) {
                 if ($result.Contains($property.Name)) { throw "Duplicate JSON property: $($property.Name)" }
                 $result.Add($property.Name, (ConvertFrom-JsonElementValue $property.Value))
@@ -26,7 +52,7 @@ function ConvertFrom-JsonElementValue {
         ([System.Text.Json.JsonValueKind]::Number) {
             $integer = [long]0
             if ($Element.TryGetInt64([ref]$integer)) { return $integer }
-            return $Element.GetDouble()
+            return [CodexKit.Config.JsonNumber]::new($Element.GetRawText())
         }
         ([System.Text.Json.JsonValueKind]::True) { return $true }
         ([System.Text.Json.JsonValueKind]::False) { return $false }
@@ -57,7 +83,7 @@ function Copy-ConfigValue {
     param([AllowNull()][object]$Value)
     if ($null -eq $Value) { return $null }
     if ($Value -is [Collections.IDictionary]) {
-        $copy = [ordered]@{}
+        $copy = New-OrdinalDictionary
         foreach ($key in $Value.Keys) {
             if ($key -isnot [string]) { throw 'CONFIG_OWNED_KEY_INVALID:<non-string>' }
             $copy.Add($key, (Copy-ConfigValue $Value[$key]))
@@ -70,11 +96,41 @@ function Copy-ConfigValue {
         return ,$items.ToArray()
     }
     if ($Value.GetType() -eq [pscustomobject]) {
-        $copy = [ordered]@{}
+        $copy = New-OrdinalDictionary
         foreach ($property in $Value.PSObject.Properties) { $copy.Add($property.Name, (Copy-ConfigValue $property.Value)) }
         return $copy
     }
     return $Value
+}
+
+function Get-ConfigNumberLiteral {
+    param([Parameter(Mandatory)][object]$Value)
+    if ($Value -is [CodexKit.Config.JsonNumber]) { return $Value.Literal }
+    $culture = [Globalization.CultureInfo]::InvariantCulture
+    switch ([Type]::GetTypeCode($Value.GetType())) {
+        ([TypeCode]::Single) { return ([single]$Value).ToString('R', $culture) }
+        ([TypeCode]::Double) { return ([double]$Value).ToString('R', $culture) }
+        ([TypeCode]::Decimal) { return ([decimal]$Value).ToString('G29', $culture) }
+        default { return ([IFormattable]$Value).ToString($null, $culture) }
+    }
+}
+
+function Get-CanonicalConfigNumber {
+    param([Parameter(Mandatory)][string]$Literal)
+    $match = [regex]::Match($Literal, '^(?<sign>-?)(?<integer>0|[1-9][0-9]*)(?:\.(?<fraction>[0-9]+))?(?:[eE](?<exponent>[+-]?[0-9]+))?$')
+    if (-not $match.Success) { throw "CONFIG_NUMBER_INVALID:$Literal" }
+    $fraction = $match.Groups['fraction'].Value
+    $digits = ($match.Groups['integer'].Value + $fraction).TrimStart('0')
+    if ($digits.Length -eq 0) { return '0e0' }
+    $power = [Numerics.BigInteger]::Zero
+    if ($match.Groups['exponent'].Success) { $power = [Numerics.BigInteger]::Parse($match.Groups['exponent'].Value, [Globalization.CultureInfo]::InvariantCulture) }
+    $power -= $fraction.Length
+    while ($digits.EndsWith('0', [StringComparison]::Ordinal)) {
+        $digits = $digits.Substring(0, $digits.Length - 1)
+        $power += [Numerics.BigInteger]::One
+    }
+    $sign = if ($match.Groups['sign'].Value -eq '-') { '-' } else { '' }
+    return $sign + $digits + 'e' + $power.ToString([Globalization.CultureInfo]::InvariantCulture)
 }
 
 function Test-ConfigDeepEqual {
@@ -103,8 +159,11 @@ function Test-ConfigDeepEqual {
         [TypeCode]::Int32, [TypeCode]::UInt32, [TypeCode]::Int64, [TypeCode]::UInt64,
         [TypeCode]::Single, [TypeCode]::Double, [TypeCode]::Decimal
     )
-    if ($numericCodes -contains [Type]::GetTypeCode($Left.GetType()) -and $numericCodes -contains [Type]::GetTypeCode($Right.GetType())) {
-        return [decimal]$Left -eq [decimal]$Right
+    $leftNumeric = $Left -is [CodexKit.Config.JsonNumber] -or $numericCodes -contains [Type]::GetTypeCode($Left.GetType())
+    $rightNumeric = $Right -is [CodexKit.Config.JsonNumber] -or $numericCodes -contains [Type]::GetTypeCode($Right.GetType())
+    if ($leftNumeric -or $rightNumeric) {
+        if (-not ($leftNumeric -and $rightNumeric)) { return $false }
+        return (Get-CanonicalConfigNumber (Get-ConfigNumberLiteral $Left)) -ceq (Get-CanonicalConfigNumber (Get-ConfigNumberLiteral $Right))
     }
     return $Left.GetType() -eq $Right.GetType() -and $Left -ceq $Right
 }
@@ -185,11 +244,15 @@ function Add-ConfigOwnedValues {
         if ($ownedValue -is [Collections.IDictionary]) {
             if ($ownedValue.Count -eq 0) {
                 $OwnedKeys.Add($path)
-                if (-not $exists) { $Target.Add($key, [ordered]@{}); $Changes.Add([pscustomobject][ordered]@{ action = 'add'; path = $path; value = [ordered]@{} }) }
+                if (-not $exists) {
+                    $empty = New-OrdinalDictionary
+                    $Target.Add($key, $empty)
+                    $Changes.Add([pscustomobject][ordered]@{ action = 'add'; path = $path; value = (New-OrdinalDictionary) })
+                }
                 elseif (-not (Test-ConfigDeepEqual $Target[$key] $ownedValue)) { throw "CONFIG_COLLISION:$path" }
                 continue
             }
-            if (-not $exists) { $Target.Add($key, [ordered]@{}) }
+            if (-not $exists) { $Target.Add($key, (New-OrdinalDictionary)) }
             elseif ($Target[$key] -isnot [Collections.IDictionary]) { throw "CONFIG_COLLISION:$path" }
             Add-ConfigOwnedValues -Target $Target[$key] -Owned $ownedValue -Prefix $path -OwnedKeys $OwnedKeys -Changes $Changes
             continue
@@ -206,7 +269,54 @@ function Add-ConfigOwnedValues {
 
 function ConvertTo-DeterministicConfigJson {
     param([Collections.IDictionary]$Document)
-    ConvertTo-Json -InputObject $Document -Depth 100
+    $stream = [IO.MemoryStream]::new()
+    $options = [System.Text.Json.JsonWriterOptions]::new()
+    $options.Indented = $true
+    $options.Encoder = [System.Text.Encodings.Web.JavaScriptEncoder]::UnsafeRelaxedJsonEscaping
+    $writer = [System.Text.Json.Utf8JsonWriter]::new($stream, $options)
+    try {
+        Write-ConfigJsonValue -Writer $writer -Value $Document
+        $writer.Flush()
+        return [Text.Encoding]::UTF8.GetString($stream.ToArray())
+    }
+    finally { $writer.Dispose(); $stream.Dispose() }
+}
+
+function Write-ConfigJsonValue {
+    param([Parameter(Mandatory)][System.Text.Json.Utf8JsonWriter]$Writer, [AllowNull()][object]$Value)
+    if ($null -eq $Value) { $Writer.WriteNullValue(); return }
+    if ($Value -is [Collections.IDictionary]) {
+        $Writer.WriteStartObject()
+        foreach ($key in $Value.Keys) {
+            $Writer.WritePropertyName([string]$key)
+            Write-ConfigJsonValue -Writer $Writer -Value $Value[$key]
+        }
+        $Writer.WriteEndObject()
+        return
+    }
+    if ($Value -is [Collections.IEnumerable] -and $Value -isnot [string]) {
+        $Writer.WriteStartArray()
+        foreach ($entry in $Value) { Write-ConfigJsonValue -Writer $Writer -Value $entry }
+        $Writer.WriteEndArray()
+        return
+    }
+    if ($Value -is [CodexKit.Config.JsonNumber]) { $Writer.WriteRawValue($Value.Literal, $false); return }
+    if ($Value -is [string]) { $Writer.WriteStringValue([string]$Value); return }
+    if ($Value -is [bool]) { $Writer.WriteBooleanValue([bool]$Value); return }
+    switch ([Type]::GetTypeCode($Value.GetType())) {
+        ([TypeCode]::Byte) { $Writer.WriteNumberValue([int]$Value); return }
+        ([TypeCode]::SByte) { $Writer.WriteNumberValue([int]$Value); return }
+        ([TypeCode]::Int16) { $Writer.WriteNumberValue([int]$Value); return }
+        ([TypeCode]::UInt16) { $Writer.WriteNumberValue([int]$Value); return }
+        ([TypeCode]::Int32) { $Writer.WriteNumberValue([int]$Value); return }
+        ([TypeCode]::UInt32) { $Writer.WriteNumberValue([uint32]$Value); return }
+        ([TypeCode]::Int64) { $Writer.WriteNumberValue([long]$Value); return }
+        ([TypeCode]::UInt64) { $Writer.WriteNumberValue([uint64]$Value); return }
+        ([TypeCode]::Single) { $Writer.WriteNumberValue([single]$Value); return }
+        ([TypeCode]::Double) { $Writer.WriteNumberValue([double]$Value); return }
+        ([TypeCode]::Decimal) { $Writer.WriteNumberValue([decimal]$Value); return }
+        default { throw "CONFIG_OWNED_VALUE_INVALID:$($Value.GetType().FullName)" }
+    }
 }
 
 function Merge-OpenCodeConfig {
@@ -269,6 +379,85 @@ function Add-ReceiptToMergeResult {
     return $Merge
 }
 
+function Get-ConfigMutexName {
+    param([Parameter(Mandatory)][string]$Path)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $hash = [Convert]::ToHexString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Path.ToUpperInvariant()))).ToLowerInvariant() }
+    finally { $sha.Dispose() }
+    return 'Local\CodexKit.Config.' + $hash
+}
+
+function Enter-ConfigDirectoryLocks {
+    param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$Parent)
+    if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { throw 'CONFIG_DIRECTORY_LOCK_UNAVAILABLE:platform' }
+    $result = [Collections.Generic.List[object]]::new()
+    try {
+        foreach ($path in @($Root, $Parent) | Select-Object -Unique) {
+            if (-not (Test-Path -LiteralPath $path -PathType Container)) { throw "CONFIG_DIRECTORY_LOCK_UNAVAILABLE:$path" }
+            $identity = (Resolve-Path -LiteralPath $path).Path
+            $handle = [CodexKit.Config.NativeDirectoryLock]::CreateFileW(
+                $identity, 0, 3, [IntPtr]::Zero, 3, 0x02000000, [IntPtr]::Zero)
+            if ($null -eq $handle -or $handle.IsInvalid) {
+                if ($null -ne $handle) { $handle.Dispose() }
+                throw "CONFIG_DIRECTORY_LOCK_UNAVAILABLE:${path}:$([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+            }
+            $result.Add([pscustomobject]@{ Path = [IO.Path]::GetFullPath($path); Identity = $identity; Handle = $handle })
+        }
+        return ,$result.ToArray()
+    }
+    catch {
+        foreach ($entry in $result) { $entry.Handle.Dispose() }
+        throw
+    }
+}
+
+function Assert-ConfigDirectoryLocksCurrent {
+    param([Parameter(Mandatory)][object[]]$Locks)
+    foreach ($entry in $Locks) {
+        if (-not (Test-Path -LiteralPath $entry.Path -PathType Container)) { throw 'CONFIG_CONCURRENT_MODIFICATION:directory missing' }
+        $item = Get-Item -LiteralPath $entry.Path -Force
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'CONFIG_CONCURRENT_MODIFICATION:directory reparse' }
+        $current = (Resolve-Path -LiteralPath $entry.Path).Path
+        if (-not $current.Equals($entry.Identity, [StringComparison]::OrdinalIgnoreCase)) { throw 'CONFIG_CONCURRENT_MODIFICATION:directory identity' }
+    }
+}
+
+function Test-ConfigBytesEqual {
+    param([AllowNull()][byte[]]$Left, [AllowNull()][byte[]]$Right)
+    if ($null -eq $Left -or $null -eq $Right) { return $null -eq $Left -and $null -eq $Right }
+    if ($Left.Length -ne $Right.Length) { return $false }
+    for ($index = 0; $index -lt $Left.Length; $index++) { if ($Left[$index] -ne $Right[$index]) { return $false } }
+    return $true
+}
+
+function Assert-ConfigFileUnchanged {
+    param([Parameter(Mandatory)][string]$Path, [AllowNull()][byte[]]$OriginalBytes)
+    $exists = Test-Path -LiteralPath $Path -PathType Leaf
+    if (($null -eq $OriginalBytes) -ne (-not $exists)) { throw 'CONFIG_CONCURRENT_MODIFICATION:existence changed' }
+    if ($exists) {
+        $current = [IO.File]::ReadAllBytes($Path)
+        if (-not (Test-ConfigBytesEqual $OriginalBytes $current)) { throw 'CONFIG_CONCURRENT_MODIFICATION:content changed' }
+    }
+}
+
+function Assert-ConfigStateUnchanged {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$Root,
+        [Parameter(Mandatory)][object[]]$Locks,
+        [AllowNull()][byte[]]$OriginalBytes
+    )
+    try {
+        [void](Assert-ConfigPath -Path $Path -Root $Root)
+        Assert-ConfigDirectoryLocksCurrent $Locks
+        Assert-ConfigFileUnchanged -Path $Path -OriginalBytes $OriginalBytes
+    }
+    catch {
+        if ($_.Exception.Message -like 'CONFIG_CONCURRENT_MODIFICATION:*') { throw }
+        throw "CONFIG_CONCURRENT_MODIFICATION:$($_.Exception.Message)"
+    }
+}
+
 function Write-OpenCodeConfig {
     [CmdletBinding()]
     param(
@@ -279,35 +468,62 @@ function Write-OpenCodeConfig {
         [Parameter(Mandatory,Position=4)][string]$BackupRoot,
         [Parameter(Mandatory,Position=5)][string]$BackupId,
         [scriptblock]$BackupCopyOperation,
-        [scriptblock]$AtomicWriteOperation
+        [scriptblock]$AtomicWriteOperation,
+        [Alias('BeforePublishOperation','PrePublishOperation')][scriptblock]$BeforePublishValidation
     )
     $fullPath = Assert-ConfigPath -Path $ConfigPath -Root $OpenCodeConfigRoot
-    $exists = Test-Path -LiteralPath $fullPath -PathType Leaf
-    if ((Test-Path -LiteralPath $fullPath) -and -not $exists) { throw "CONFIG_PATH_OUTSIDE_ROOT:$ConfigPath" }
-    $existingText = if ($exists) { [IO.File]::ReadAllText($fullPath, [Text.Encoding]::UTF8) } else { '{}' }
-    $merge = Merge-OpenCodeConfig -ExistingText $existingText -Owned $Owned
-    $receiptCopy = Copy-ValidatedInstallReceipt $Receipt
-    Add-ReceiptOwnedPath -Receipt $receiptCopy -Path $fullPath
-    foreach ($key in $merge.OwnedKeys) { Add-ReceiptOwnedKey -Receipt $receiptCopy -Key $key }
-    [void](Assert-InstallReceipt $receiptCopy)
-    if (-not $merge.Changed) { return Add-ReceiptToMergeResult -Merge $merge -Receipt $receiptCopy }
-
-    $backupParameters = @{ Receipt = $receiptCopy; Path = $fullPath; BackupRoot = $BackupRoot; BackupId = $BackupId; AllowedRoots = @($OpenCodeConfigRoot) }
-    if ($PSBoundParameters.ContainsKey('BackupCopyOperation')) { $backupParameters.CopyOperation = $BackupCopyOperation }
-    [void](Backup-InstallPath @backupParameters)
-    [void](Assert-InstallReceipt $receiptCopy)
     $parent = [IO.Path]::GetDirectoryName($fullPath)
     New-Item -ItemType Directory -Path $parent -Force | Out-Null
-    $temp = Join-Path $parent ('.' + [IO.Path]::GetFileName($fullPath) + '.' + [guid]::NewGuid().ToString('N') + '.tmp')
+    $mutex = [Threading.Mutex]::new($false, (Get-ConfigMutexName $fullPath))
+    $mutexAcquired = $false
     try {
-        if ($PSBoundParameters.ContainsKey('AtomicWriteOperation')) { & $AtomicWriteOperation $temp $fullPath $merge.Json }
-        else {
-            [IO.File]::WriteAllText($temp, $merge.Json, [Text.UTF8Encoding]::new($false))
-            [IO.File]::Move($temp, $fullPath, $true)
+        try { $mutexAcquired = $mutex.WaitOne([timespan]::FromSeconds(30)) }
+        catch [Threading.AbandonedMutexException] { $mutexAcquired = $true }
+        if (-not $mutexAcquired) { throw 'CONFIG_LOCK_TIMEOUT' }
+        $locks = Enter-ConfigDirectoryLocks -Root ([IO.Path]::GetFullPath($OpenCodeConfigRoot)) -Parent $parent
+        try {
+            [void](Assert-ConfigPath -Path $fullPath -Root $OpenCodeConfigRoot)
+            Assert-ConfigDirectoryLocksCurrent $locks
+            $exists = Test-Path -LiteralPath $fullPath -PathType Leaf
+            if ((Test-Path -LiteralPath $fullPath) -and -not $exists) { throw "CONFIG_PATH_OUTSIDE_ROOT:$ConfigPath" }
+            $originalBytes = if ($exists) { [IO.File]::ReadAllBytes($fullPath) } else { $null }
+            $existingText = if ($exists) { [IO.File]::ReadAllText($fullPath, [Text.Encoding]::UTF8) } else { '{}' }
+            $merge = Merge-OpenCodeConfig -ExistingText $existingText -Owned $Owned
+            $receiptCopy = Copy-ValidatedInstallReceipt $Receipt
+            Add-ReceiptOwnedPath -Receipt $receiptCopy -Path $fullPath
+            foreach ($key in $merge.OwnedKeys) { Add-ReceiptOwnedKey -Receipt $receiptCopy -Key $key }
+            [void](Assert-InstallReceipt $receiptCopy)
+            if (-not $merge.Changed) { return Add-ReceiptToMergeResult -Merge $merge -Receipt $receiptCopy }
+
+            if ($PSBoundParameters.ContainsKey('BeforePublishValidation')) {
+                try { & $BeforePublishValidation }
+                catch { throw "CONFIG_CONCURRENT_MODIFICATION:$($_.Exception.Message)" }
+            }
+            Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes
+
+            $backupParameters = @{ Receipt = $receiptCopy; Path = $fullPath; BackupRoot = $BackupRoot; BackupId = $BackupId; AllowedRoots = @($OpenCodeConfigRoot) }
+            if ($PSBoundParameters.ContainsKey('BackupCopyOperation')) { $backupParameters.CopyOperation = $BackupCopyOperation }
+            [void](Backup-InstallPath @backupParameters)
+            [void](Assert-InstallReceipt $receiptCopy)
+            Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes
+
+            $temp = Join-Path $parent ('.' + [IO.Path]::GetFileName($fullPath) + '.' + [guid]::NewGuid().ToString('N') + '.tmp')
+            try {
+                if ($PSBoundParameters.ContainsKey('AtomicWriteOperation')) { & $AtomicWriteOperation $temp $fullPath $merge.Json }
+                else { [IO.File]::WriteAllText($temp, $merge.Json, [Text.UTF8Encoding]::new($false)) }
+                Assert-ConfigStateUnchanged -Path $fullPath -Root $OpenCodeConfigRoot -Locks $locks -OriginalBytes $originalBytes
+                if (-not (Test-Path -LiteralPath $temp -PathType Leaf)) { throw 'CONFIG_ATOMIC_TEMP_MISSING' }
+                [IO.File]::Move($temp, $fullPath, $true)
+            }
+            finally { if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Force } }
+            return Add-ReceiptToMergeResult -Merge $merge -Receipt $receiptCopy
         }
+        finally { foreach ($entry in $locks) { $entry.Handle.Dispose() } }
     }
-    finally { if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Force } }
-    return Add-ReceiptToMergeResult -Merge $merge -Receipt $receiptCopy
+    finally {
+        if ($mutexAcquired) { $mutex.ReleaseMutex() }
+        $mutex.Dispose()
+    }
 }
 
 Export-ModuleMember -Function ConvertFrom-Jsonc, Merge-OpenCodeConfig, Write-OpenCodeConfig
