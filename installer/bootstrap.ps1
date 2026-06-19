@@ -4,10 +4,12 @@ param(
     [string]$Command = 'install',
 
     [string]$Project,
+    [string]$ReceiptPath,
     [switch]$Resume,
     [switch]$NonInteractive,
     [switch]$Json,
-    [switch]$ConfirmInstall
+    [switch]$ConfirmInstall,
+    [switch]$ConfirmRollback
 )
 
 Set-StrictMode -Version Latest
@@ -29,7 +31,7 @@ if (-not (Test-Path -LiteralPath $handlerPath -PathType Leaf)) {
 }
 
 $handlerParameters = @{}
-foreach ($name in @('Project', 'Resume', 'NonInteractive', 'Json', 'ConfirmInstall')) {
+foreach ($name in @('Project', 'ReceiptPath', 'Resume', 'NonInteractive', 'Json', 'ConfirmInstall', 'ConfirmRollback')) {
     if ($PSBoundParameters.ContainsKey($name)) {
         $handlerParameters[$name] = $PSBoundParameters[$name]
     }

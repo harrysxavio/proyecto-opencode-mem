@@ -28,18 +28,22 @@ Describe 'bootstrap command router' {
         @'
 param(
     [string]$Project,
+    [string]$ReceiptPath,
     [switch]$Resume,
     [switch]$NonInteractive,
     [switch]$Json,
-    [switch]$ConfirmInstall
+    [switch]$ConfirmInstall,
+    [switch]$ConfirmRollback
 )
 [pscustomobject]@{
     HandlerPath = $PSCommandPath
     Project = $Project
+    ReceiptPath = $ReceiptPath
     Resume = [bool]$Resume
     NonInteractive = [bool]$NonInteractive
     Json = [bool]$Json
     ConfirmInstall = [bool]$ConfirmInstall
+    ConfirmRollback = [bool]$ConfirmRollback
 }
 '@ | Set-Content -LiteralPath $handlerPath
 
@@ -57,5 +61,19 @@ param(
         $result.NonInteractive | Should -BeTrue
         $result.Json | Should -BeTrue
         $result.ConfirmInstall | Should -BeTrue
+    }
+
+    It 'forwards rollback receipt and confirmation only as structured parameters' {
+        $handlerPath = Join-Path $commandsRoot 'rollback.ps1'
+        @'
+param([string]$ReceiptPath, [switch]$NonInteractive, [switch]$Json, [switch]$ConfirmRollback)
+[pscustomobject]@{ ReceiptPath = $ReceiptPath; NonInteractive = [bool]$NonInteractive; Json = [bool]$Json; ConfirmRollback = [bool]$ConfirmRollback }
+'@ | Set-Content -LiteralPath $handlerPath
+        try { $result = & $bootstrapPath rollback -ReceiptPath 'path with spaces.json' -NonInteractive -Json -ConfirmRollback }
+        finally { Remove-Item -LiteralPath $handlerPath -Force -ErrorAction SilentlyContinue }
+        $result.ReceiptPath | Should -Be 'path with spaces.json'
+        $result.NonInteractive | Should -BeTrue
+        $result.Json | Should -BeTrue
+        $result.ConfirmRollback | Should -BeTrue
     }
 }
