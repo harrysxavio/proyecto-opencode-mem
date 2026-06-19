@@ -145,7 +145,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 ### 2026-06-19 — Task 6
 
 - Status: `completed`.
-- Commits: inicio `4b11ac3`; implementación `0c6e838`; remediación Quality inicio `8b84390`; hardening `c5b83ae`.
+- Commits: inicio `4b11ac3`; implementación `0c6e838`; remediación Quality inicio `8b84390`; hardening `c5b83ae`; checkpoint `ba916e3`.
 - Tests:
   - TDD RED inicial: `0/19` passed; `19/19` fallaron por módulos y APIs aún ausentes.
   - GREEN parcial: `18/19` passed; una aserción Pester enumeraba el array de argumentos.
@@ -158,8 +158,8 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
   - `git diff --check`: `PASS`.
 - Reviews:
   - Self-review: `APPROVED`.
-  - Spec: `PENDING`.
-  - Quality: `PENDING RE-REVIEW` tras remediar atomicidad de checkpoints, plan/callbacks inmutables, registro canónico y eliminar el seam `Registry`.
+  - Spec: `APPROVED`.
+  - Quality: `APPROVED`.
 
 ## Decisiones
 
