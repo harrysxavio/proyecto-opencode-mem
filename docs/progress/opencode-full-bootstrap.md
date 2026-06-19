@@ -25,7 +25,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 | Task 3 | [Implement Windows preflight and confirmed prerequisite installation](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-3-implement-windows-preflight-and-confirmed-prerequisite-installation) | `completed` |
 | Task 4 | [Add receipts, backups, checkpoints, resume and safe rollback](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-4-add-receipts-backups-checkpoints-resume-and-safe-rollback) | `completed` |
 | Task 5 | [Compose OpenCode JSON/JSONC without overwriting user entries](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-5-compose-opencode-jsonjsonc-without-overwriting-user-entries) | `completed` |
-| Task 6 | [Implement dependency execution and the verification registry](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-6-implement-dependency-execution-and-the-verification-registry) | `in_progress` |
+| Task 6 | [Implement dependency execution and the verification registry](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-6-implement-dependency-execution-and-the-verification-registry) | `completed` |
 | Task 7 | [Install the pinned OpenCode, Engram and Graphify core](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-7-install-the-pinned-opencode-engram-and-graphify-core) | `pending` |
 | Task 8 | [Configure and probe credential-free MCP servers](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-8-configure-and-probe-credential-free-mcp-servers) | `pending` |
 | Task 9 | [Install canonical Manager, ten SDD subagents, skills and audited plugins](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-9-install-canonical-manager-ten-sdd-subagents-skills-and-audited-plugins) | `pending` |
@@ -38,7 +38,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 
 ## Estado actual
 
-- Tarea activa: [Task 6 — Implement dependency execution and the verification registry](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-6-implement-dependency-execution-and-the-verification-registry) (`in_progress`).
+- Tarea activa: ninguna.
 - Siguiente tarea: [Task 7 — Install the pinned OpenCode, Engram and Graphify core](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-7-install-the-pinned-opencode-engram-and-graphify-core) (`pending`).
 
 ## Checkpoints
@@ -144,10 +144,20 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 
 ### 2026-06-19 — Task 6
 
-- Status: `in_progress`.
-- Commits: inicio pendiente.
-- Tests: TDD pendiente.
-- Reviews: Self pendiente; Spec pendiente; Quality pendiente.
+- Status: `completed`.
+- Commits: inicio `4b11ac3`; implementación `0c6e838`.
+- Tests:
+  - TDD RED inicial: `0/19` passed; `19/19` fallaron por módulos y APIs aún ausentes.
+  - GREEN parcial: `18/19` passed; una aserción Pester enumeraba el array de argumentos.
+  - TDD focalizado final: `23/23`.
+  - `pnpm test:powershell`: `131/131`.
+  - `pnpm test:all`: `109/109`.
+  - `pnpm docs:check`: `PASS`.
+  - `git diff --check`: `PASS`.
+- Reviews:
+  - Self-review: `APPROVED`.
+  - Spec: `PENDING`.
+  - Quality: `PENDING`.
 
 ## Decisiones
 
