@@ -26,7 +26,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 | Task 4 | [Add receipts, backups, checkpoints, resume and safe rollback](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-4-add-receipts-backups-checkpoints-resume-and-safe-rollback) | `completed` |
 | Task 5 | [Compose OpenCode JSON/JSONC without overwriting user entries](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-5-compose-opencode-jsonjsonc-without-overwriting-user-entries) | `completed` |
 | Task 6 | [Implement dependency execution and the verification registry](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-6-implement-dependency-execution-and-the-verification-registry) | `completed` |
-| Task 7 | [Install the pinned OpenCode, Engram and Graphify core](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-7-install-the-pinned-opencode-engram-and-graphify-core) | `in_progress` |
+| Task 7 | [Install the pinned OpenCode, Engram and Graphify core](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-7-install-the-pinned-opencode-engram-and-graphify-core) | `completed` |
 | Task 8 | [Configure and probe credential-free MCP servers](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-8-configure-and-probe-credential-free-mcp-servers) | `pending` |
 | Task 9 | [Install canonical Manager, ten SDD subagents, skills and audited plugins](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-9-install-canonical-manager-ten-sdd-subagents-skills-and-audited-plugins) | `pending` |
 | Task 10 | [Add optional authenticated integrations and secure continuation](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-10-add-optional-authenticated-integrations-and-secure-continuation) | `pending` |
@@ -38,7 +38,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 
 ## Estado actual
 
-- Tarea activa: [Task 7 — Install the pinned OpenCode, Engram and Graphify core](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-7-install-the-pinned-opencode-engram-and-graphify-core) (`in_progress`).
+- Tarea activa: ninguna.
 - Siguiente tarea: [Task 8 — Configure and probe credential-free MCP servers](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-8-configure-and-probe-credential-free-mcp-servers) (`pending`).
 
 ## Checkpoints
@@ -161,9 +161,33 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
   - Spec: `APPROVED`.
   - Quality: `APPROVED`.
 
+### 2026-06-19 — Task 7
+
+- Status: `completed`.
+- Commits: inicio `7c096e2`; implementación `b7445b9`.
+- Provenance Engram:
+  - URL inmutable: `https://github.com/Gentleman-Programming/engram/releases/download/v1.16.3/engram_1.16.3_windows_amd64.zip`.
+  - SHA256 oficial y verificado por descarga: `7e26447bf79040c79583f4cbd8acac4665e3c73ebc4eeb25d911763204dc0089`.
+  - Estado: `project-pinned-verified-download`.
+- Provenance Graphify: wheel PyPI `graphifyy-0.8.41-py3-none-any.whl`, SHA256 `ac2134b89a801e1a8bdf8f9b2bf2ac273c60e8cb8745f5818e6b22098002ebe3`.
+- Tests:
+  - TDD RED inicial: `0/9`; módulo, APIs y lock verificado ausentes.
+  - TDD RED integración install: `9/10`; faltaba el contrato de core en `install.ps1`.
+  - TDD RED reuse/mismatch: `9/11`; faltaba detección de herramientas compatibles.
+  - TDD GREEN focalizado: `11/11`.
+  - `pnpm test:powershell`: `153/153`.
+  - `pnpm test:all`: `109/109`.
+  - `pnpm docs:check`: `PASS`.
+  - `git diff --check`: `PASS`.
+  - Probe manual: Engram `1.16.3` persistió y encontró un canary con `ENGRAM_DATA_DIR` aislado; Graphify `0.8.41` creó `graph.json` y consultó `hello` desde el fixture.
+- Reviews:
+  - Self-review: `APPROVED`.
+  - Spec: `PENDING`.
+  - Quality: `PENDING`.
+
 ## Decisiones
 
-- Engram permanece `planning-only-unverified` / `blocked` hasta verificar su integridad oficial.
+- Engram `1.16.3` está habilitado mediante asset Windows amd64 versionado, checksum oficial y verificación local previa a publicación.
 - `OPENCODE_KIT_ROOT` define la ownership del kit.
 - No afirmar `100%` hasta completar un E2E limpio en Windows.
 
