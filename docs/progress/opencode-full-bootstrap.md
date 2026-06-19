@@ -39,7 +39,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 ## Estado actual
 
 - Tarea activa: ninguna.
-- Siguiente tarea: [Task 4 — Add receipts, backups, checkpoints, resume and safe rollback](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-4-add-receipts-backups-checkpoints-resume-and-safe-rollback) (`pending-next`).
+- Siguiente tarea: [Task 4 — Add receipts, backups, checkpoints, resume and safe rollback](../superpowers/plans/2026-06-18-opencode-full-bootstrap-implementation.md#task-4-add-receipts-backups-checkpoints-resume-and-safe-rollback) (`pending`).
 
 ## Checkpoints
 
@@ -71,7 +71,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 ### 2026-06-18 — Task 3
 
 - Status: `completed`.
-- Commits: inicio `a8d5e9b`; implementación `40cd384`; quality fixes `3fde3c3`, `c36f5a3`.
+- Commits: inicio `a8d5e9b`; implementación `40cd384`; quality fixes `3fde3c3`, `c36f5a3`; checkpoint `4d9c8a8`.
 - Tests:
   - TDD RED focalizado: `2/13` passed, `11/13` failed por funcionalidad aún ausente.
   - TDD GREEN focalizado: `14/14`.
@@ -86,7 +86,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 - Reviews:
   - Self-review: `APPROVED`.
   - Spec: `PENDING`.
-  - Quality: `PENDING` (último hallazgo corregido; re-review pendiente).
+  - Quality: `APPROVED`.
 
 ## Decisiones
 
