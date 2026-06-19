@@ -91,7 +91,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 ### 2026-06-18 — Task 4
 
 - Status: `completed`.
-- Commits: inicio `01f8acf`; implementación `49cb141`; remediaciones de seguridad/calidad `77bab38`, `1441d65`, `6c32ffc`.
+- Commits: inicio `01f8acf`; implementación `49cb141`; remediaciones de seguridad/calidad `77bab38`, `1441d65`, `6c32ffc`; checkpoint final `c31ce43`.
 - Tests:
   - TDD RED inicial: `0/12` passed; `12/12` fallaron por módulo y comando ausentes.
   - TDD RED forwarding: `8/9` passed; `1/9` falló por parámetros de rollback aún ausentes.
@@ -110,7 +110,7 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 - Reviews:
   - Self-review: `APPROVED`.
   - Spec: `PENDING RE-REVIEW` tras remediar prevalidación de `BackupRoot`, conflictos globales y mutación del plan desde `ConfirmationReader`.
-  - Quality: `PENDING RE-REVIEW` tras remediar colisiones/publicación de backups e IDs ambiguos de componentes.
+  - Quality: `APPROVED`.
 
 ## Decisiones
 
