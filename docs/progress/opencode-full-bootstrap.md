@@ -225,6 +225,34 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
   - `git diff --check`: `PASS`.
 - Review: `PENDING RE-REVIEW`; no se inició Task 8.
 
+### 2026-06-20 — Task 7, remediación de Quality
+
+- Status: `in_progress`; los cuatro hallazgos de Quality fueron remediados y quedan pendientes de re-review.
+- Commit de implementación: `5c59ff0`.
+- TDD RED: `18/24` passed; los seis fallos reprodujeron Resume repitiendo las seis fases, receipts missing/corrupt no rechazados, fallback inseguro de comandos, ausencia de backup/restore Engram y escritura posible mediante junction.
+- TDD GREEN focalizado: `25/25`.
+- Engram transaccional:
+  - usa `Backup-InstallPath` y `Save-InstallReceipt` antes de `Move`;
+  - conserva el backup bajo el `KitRoot` user-owned y en el receipt canónico;
+  - restaura el ejecutable previo o elimina el nuevo inmediatamente si el post-probe falla;
+  - un receipt fallido permanece antes de `INSTALLED/VERIFIED` y conserva evidencia para rollback posterior.
+- Ownership/TOCTOU:
+  - combina `Assert-OwnedPath` con las primitivas de ConfigComposer para creación segmentada, handles de directorio, rechazo reparse y comparación de FileId;
+  - revalida candidate, backup, receipt y target antes/después de publicar y nuevamente después del post-probe;
+  - un junction en `KitRoot/bin` es rechazado y la prueba confirma cero escritura outside.
+- Resume real:
+  - `install.ps1 -Resume` carga y valida `state/install-receipt.json`, verifica `kitVersion` y lock digest, y falla con códigos estables para missing/corrupt/incompatible;
+  - una segunda ejecución no repite ninguna de las seis fases de los tres componentes ya `VERIFIED`.
+- Fail-closed: pnpm, OpenCode, uv y Graphify sin `.exe/.cmd` seguro producen `CORE_COMMAND_UNRESOLVED:<id>`; los shims `.ps1` nunca se invocan.
+- Gates:
+  - `pnpm test:powershell`: `170/170`.
+  - `pnpm test:all`: `109/109`.
+  - `pnpm validate`: `PASS`.
+  - `pnpm sanitize:check`: `PASS`.
+  - `pnpm docs:check`: `PASS`.
+  - `git diff --check`: `PASS`.
+- Review: `PENDING RE-REVIEW`; no se inició Task 8.
+
 ## Decisiones
 
 - Engram `1.16.3` está habilitado mediante asset Windows amd64 versionado, checksum oficial y verificación local previa a publicación.
