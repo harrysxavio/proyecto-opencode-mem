@@ -2,6 +2,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot 'ProcessRunner.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'CommandResolution.psm1') -Force
 
 function Get-CoreComponentPreview {
     [CmdletBinding()]
@@ -13,7 +14,9 @@ function Get-CoreComponentPreview {
             Command = [string]$_.install.command
             Arguments = [string[]]@($_.install.arguments)
             Download = if ($_.id -ceq 'engram') { [string]$_.source.url } else { $null }
-            Target = if ($_.id -ceq 'engram') { Join-Path ([IO.Path]::GetFullPath($KitRoot)) 'bin/engram.exe' } else { "command:$($_.id)" }
+            Target = if ($_.id -ceq 'engram') { Join-Path ([IO.Path]::GetFullPath($KitRoot)) 'bin/engram.exe' }
+                elseif ($_.id -ceq 'graphify') { 'uv-tool-bin:graphify.exe' }
+                else { "command:$($_.id)" }
         }
     })
 }
@@ -55,25 +58,41 @@ function Install-CoreComponent {
     if (@('opencode','engram','graphify') -cnotcontains $id) { throw "CORE_INSTALL_FAILED:$id`: unsupported core component" }
     $invoke = if ($PSBoundParameters.ContainsKey('ProcessInvoker')) { $ProcessInvoker } else { { param($FilePath,$Arguments) Invoke-SafeProcess -FilePath $FilePath -Arguments $Arguments } }
     if ($id -cne 'engram') {
-        $resolve = if ($PSBoundParameters.ContainsKey('CommandResolver')) { $CommandResolver } else {
-            { param($name) $command=Get-Command -Name $name -CommandType Application,ExternalScript -ErrorAction SilentlyContinue | Select-Object -First 1; if($null -ne $command){$command.Source} }
+        $safeArgs = @{}
+        if ($PSBoundParameters.ContainsKey('CommandResolver')) { $safeArgs.CommandResolver=$CommandResolver }
+        $installPath = Resolve-SafeWindowsCommand -Name ([string]$Component.install.command) @safeArgs
+        if ([string]::IsNullOrWhiteSpace($installPath)) { $installPath = [string]$Component.install.command }
+        $uvPath = if ($id -ceq 'graphify') { $installPath } else { $null }
+        $existingPath = if ($id -ceq 'opencode') {
+            Resolve-SafeWindowsCommand -Name 'opencode' @safeArgs
         }
-        $existingPath = & $resolve $id
+        else {
+            $toolArgs = @{ ToolName='graphify'; UvPath=$uvPath; ProcessInvoker=$invoke }
+            if ($PSBoundParameters.ContainsKey('CommandResolver')) { $toolArgs.CommandResolver=$CommandResolver }
+            Resolve-UvToolExecutable @toolArgs
+        }
+        $hadExisting = -not [string]::IsNullOrWhiteSpace([string]$existingPath)
         $previousVersion = $null
-        if (-not [string]::IsNullOrWhiteSpace([string]$existingPath)) {
+        if ($hadExisting) {
             $previousVersion = Get-ProcessVersion -FilePath ([string]$existingPath) -Arguments @('--version') -ProcessInvoker $invoke
             if ($previousVersion -ceq [string]$Component.version) {
                 return [pscustomobject][ordered]@{ Id=$id; Version=$previousVersion; Status='REUSED'; Action='REUSE_PINNED'; Target=[string]$existingPath }
             }
         }
-        try { $result = & $invoke ([string]$Component.install.command) ([string[]]@($Component.install.arguments)) }
+        try { $result = & $invoke $installPath ([string[]]@($Component.install.arguments)) }
         catch { throw "CORE_INSTALL_FAILED:$id`: $($_.Exception.Message)" }
         if ($null -eq $result -or $result.ExitCode -ne 0) { throw "CORE_INSTALL_FAILED:$id`: process failed" }
-        $installedPath = & $resolve $id
-        if ([string]::IsNullOrWhiteSpace([string]$installedPath)) { $installedPath = $id }
+        $installedPath = if ($id -ceq 'opencode') {
+            Resolve-SafeWindowsCommand -Name 'opencode' @safeArgs
+        }
+        else {
+            $toolArgs = @{ ToolName='graphify'; UvPath=$uvPath; ProcessInvoker=$invoke }
+            if ($PSBoundParameters.ContainsKey('CommandResolver')) { $toolArgs.CommandResolver=$CommandResolver }
+            Resolve-UvToolExecutable @toolArgs
+        }
         $installedVersion = Get-ProcessVersion -FilePath ([string]$installedPath) -Arguments @('--version') -ProcessInvoker $invoke
         Assert-CoreVersion -Id $id -ExpectedVersion ([string]$Component.version) -ActualVersion $installedVersion
-        $action = if ($null -ne $previousVersion) { 'UPDATE_TO_PINNED' } else { 'INSTALL_PINNED' }
+        $action = if ($hadExisting) { 'UPDATE_TO_PINNED' } else { 'INSTALL_PINNED' }
         return [pscustomobject][ordered]@{ Id=$id; Version=$installedVersion; Status='INSTALLED'; Action=$action; Target=[string]$installedPath; PreviousVersion=$previousVersion }
     }
 

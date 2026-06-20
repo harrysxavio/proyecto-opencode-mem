@@ -2,6 +2,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot 'ProcessRunner.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'CommandResolution.psm1') -Force
 
 $script:VerificationRegistry = @(
     [pscustomobject][ordered]@{ Id='git.version'; Kind='version'; Command='git'; Arguments=@('--version'); Handler=$null }
@@ -130,6 +131,9 @@ function Invoke-VerificationId {
         [Parameter(Mandatory)][string]$Id,
         [string]$ExpectedVersion,
         [scriptblock]$ProcessInvoker,
+        [scriptblock]$CommandResolver,
+        [string]$CommandPath,
+        [string]$UvPath,
         [System.Collections.IDictionary]$ProbeHandlers
     )
 
@@ -144,8 +148,22 @@ function Invoke-VerificationId {
         $invoker = if ($PSBoundParameters.ContainsKey('ProcessInvoker')) { $ProcessInvoker } else {
             { param($FilePath,$Arguments) Invoke-SafeProcess -FilePath $FilePath -Arguments $Arguments }
         }
+        $safeArgs = @{}
+        if ($PSBoundParameters.ContainsKey('CommandResolver')) { $safeArgs.CommandResolver=$CommandResolver }
+        $resolvedCommand = if (-not [string]::IsNullOrWhiteSpace($CommandPath)) { $CommandPath }
+        elseif ($Id -ceq 'opencode.version') { Resolve-SafeWindowsCommand -Name 'opencode' @safeArgs }
+        elseif ($Id -ceq 'graphify.version') {
+            $resolvedUv = if (-not [string]::IsNullOrWhiteSpace($UvPath)) { $UvPath } else { Resolve-SafeWindowsCommand -Name 'uv' @safeArgs }
+            $toolArgs = @{ ToolName='graphify'; UvPath=$resolvedUv; ProcessInvoker=$invoker }
+            if ($PSBoundParameters.ContainsKey('CommandResolver')) { $toolArgs.CommandResolver=$CommandResolver }
+            Resolve-UvToolExecutable @toolArgs
+        }
+        else { [string]$descriptor.Command }
+        if ([string]::IsNullOrWhiteSpace($resolvedCommand)) {
+            return New-VerificationResult $Id 'FAIL' 'VERIFICATION_COMMAND_UNRESOLVED' $null $ExpectedVersion $null
+        }
         $processArguments = [string[]]@($descriptor.Arguments | ForEach-Object { [string]$_ })
-        try { $processResult = & $invoker $descriptor.Command $processArguments }
+        try { $processResult = & $invoker $resolvedCommand $processArguments }
         catch { return New-VerificationResult $Id 'FAIL' 'VERIFICATION_PROCESS_EXCEPTION' $_.Exception.Message $ExpectedVersion $null }
         $typedProcessResult = $null -ne $processResult -and $processResult -isnot [bool] -and $processResult -isnot [string]
         if ($typedProcessResult) {
@@ -170,9 +188,27 @@ function Invoke-VerificationId {
     }
 
     if ($null -eq $ProbeHandlers) {
+        $functionalInvoker = if ($PSBoundParameters.ContainsKey('ProcessInvoker')) { $ProcessInvoker } else { $null }
+        $functionalGraphifyPath = $null
+        if ($descriptor.Handler -ceq 'graphify.query') {
+            $safeArgs = @{}
+            if ($PSBoundParameters.ContainsKey('CommandResolver')) { $safeArgs.CommandResolver=$CommandResolver }
+            $resolvedUv = if (-not [string]::IsNullOrWhiteSpace($UvPath)) { $UvPath } else { Resolve-SafeWindowsCommand -Name 'uv' @safeArgs }
+            $toolArgs = @{ ToolName='graphify'; UvPath=$resolvedUv }
+            if ($null -ne $functionalInvoker) { $toolArgs.ProcessInvoker=$functionalInvoker }
+            if ($PSBoundParameters.ContainsKey('CommandResolver')) { $toolArgs.CommandResolver=$CommandResolver }
+            $functionalGraphifyPath = Resolve-UvToolExecutable @toolArgs
+        }
         $ProbeHandlers = @{
             'engram.persist' = { Test-EngramPersistence }
-            'graphify.query' = { Test-GraphifyFixture }
+            'graphify.query' = {
+                if ([string]::IsNullOrWhiteSpace($functionalGraphifyPath)) {
+                    return [pscustomobject]@{ Success=$false; Evidence=[pscustomobject]@{ Stage='resolution'; Error='uv-owned graphify executable unavailable' } }
+                }
+                $probeArgs = @{ GraphifyPath=$functionalGraphifyPath }
+                if ($null -ne $functionalInvoker) { $probeArgs.ProcessInvoker=$functionalInvoker }
+                Test-GraphifyFixture @probeArgs
+            }.GetNewClosure()
         }
     }
     if (-not $ProbeHandlers.Contains($descriptor.Handler) -or $ProbeHandlers[$descriptor.Handler] -isnot [scriptblock]) {

@@ -34,6 +34,7 @@ Import-Module (Join-Path $installerRoot 'modules/CoreComponents.psm1') -Force
 Import-Module (Join-Path $installerRoot 'modules/ComponentRunner.psm1') -Force
 Import-Module (Join-Path $installerRoot 'modules/Receipt.psm1') -Force
 Import-Module (Join-Path $installerRoot 'modules/Verification.psm1') -Force
+Import-Module (Join-Path $installerRoot 'modules/CommandResolution.psm1') -Force
 $lock = Read-ComponentLock -Path (Join-Path $installerRoot 'components.lock.json')
 $core = @($lock.components | Where-Object { $_.id -cin @('opencode','engram','graphify') } | ForEach-Object {
     $copy = $_ | ConvertTo-Json -Depth 30 -Compress | ConvertFrom-Json -Depth 30
@@ -95,19 +96,27 @@ if ($result.Status -ceq 'COMPLETED' -and $result.InstallApproved) {
                 return [pscustomobject]@{ Status=$(if($probe.Success){'PASS'}else{'FAIL'}); ErrorCode=$(if($probe.Success){$null}else{'VERIFICATION_PROBE_FAILED'}); Evidence=$probe.Evidence }
             }
             if ($Id -ceq 'graphify.query') {
-                $probeArgs = @{}
+                $uvPath = Resolve-SafeWindowsCommand -Name 'uv'
+                $toolArgs = @{ ToolName='graphify'; UvPath=$uvPath }
+                if ($null -ne $CoreProcessInvoker) { $toolArgs.ProcessInvoker=$CoreProcessInvoker }
+                $graphifyPath = Resolve-UvToolExecutable @toolArgs
+                $probeArgs = @{ GraphifyPath=$graphifyPath }
                 if ($null -ne $CoreProcessInvoker) { $probeArgs.ProcessInvoker=$CoreProcessInvoker }
                 $probe = Test-GraphifyFixture @probeArgs
                 return [pscustomobject]@{ Status=$(if($probe.Success){'PASS'}else{'FAIL'}); ErrorCode=$(if($probe.Success){$null}else{'VERIFICATION_PROBE_FAILED'}); Evidence=$probe.Evidence }
             }
-            $verifyArgs = @{ Id=$Id; ExpectedVersion=[string]$Component.version }
             $mapped = {
                 param($FilePath,$Arguments)
                 if($FilePath -ceq 'engram'){ $FilePath=Join-Path ([IO.Path]::GetFullPath($KitRoot)) 'bin/engram.exe' }
                 if ($null -ne $CoreProcessInvoker) { & $CoreProcessInvoker $FilePath $Arguments }
                 else { Invoke-SafeProcess -FilePath $FilePath -Arguments $Arguments }
             }.GetNewClosure()
-            $verifyArgs.ProcessInvoker=$mapped
+            $verifyArgs = @{ Id=$Id; ExpectedVersion=[string]$Component.version; ProcessInvoker=$mapped }
+            if ($Id -ceq 'opencode.version') { $verifyArgs.CommandPath=Resolve-SafeWindowsCommand -Name 'opencode' }
+            if ($Id -ceq 'graphify.version') {
+                $uvPath = Resolve-SafeWindowsCommand -Name 'uv'
+                $verifyArgs.CommandPath=Resolve-UvToolExecutable -ToolName 'graphify' -UvPath $uvPath -ProcessInvoker $mapped
+            }
             Invoke-VerificationId @verifyArgs
         }.GetNewClosure()
     }

@@ -255,7 +255,7 @@
       ],
       "required": true,
       "ownedTargets": [
-        "command:graphify"
+        "uv-tool-bin:graphify.exe"
       ]
     },
     {
