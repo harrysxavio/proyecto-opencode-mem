@@ -163,8 +163,8 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
 
 ### 2026-06-19 — Task 7
 
-- Status: `completed`.
-- Commits: inicio `7c096e2`; implementación `b7445b9`.
+- Status: `in_progress`; remediación de Spec implementada y pendiente de re-review independiente.
+- Commits: inicio `7c096e2`; implementación `b7445b9`; inicio remediación `776a902`; remediación `284da8b`.
 - Provenance Engram:
   - URL inmutable: `https://github.com/Gentleman-Programming/engram/releases/download/v1.16.3/engram_1.16.3_windows_amd64.zip`.
   - SHA256 oficial y verificado por descarga: `7e26447bf79040c79583f4cbd8acac4665e3c73ebc4eeb25d911763204dc0089`.
@@ -182,8 +182,26 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
   - Probe manual: Engram `1.16.3` persistió y encontró un canary con `ENGRAM_DATA_DIR` aislado; Graphify `0.8.41` creó `graph.json` y consultó `hello` desde el fixture.
 - Reviews:
   - Self-review: `APPROVED`.
-  - Spec: `PENDING`.
+  - Spec: `CHANGES_REQUESTED`; se corrigieron los dos hallazgos y queda pendiente el re-review.
   - Quality: `PENDING`.
+
+### 2026-06-20 — Task 7, remediación de Spec
+
+- Se preservaron e inspeccionaron los cambios parciales del agente anterior antes de continuar.
+- TDD RED focalizado: `11/14` passed; fallaron la señal `UPDATE_TO_PINNED`, el post-probe exacto y la actualización controlada de Engram.
+- TDD GREEN focalizado: `15/15`.
+- La aprobación interactiva válida y `-ConfirmInstall` ahora producen `InstallApproved = true` y ejecutan el plan core una sola vez; una cancelación ejecuta cero componentes core.
+- Un componente existente con versión distinta se reinstala en el pin con `Action = UPDATE_TO_PINNED`; toda instalación/reinstalación se vuelve a probar y falla como `COMPONENT_VERSION_MISMATCH:<id>:expected:<v>:actual:<v>` si no quedó exacta.
+- Engram verifica checksum y versión del candidato antes de publicarlo, reemplaza la versión distinta por el pin y vuelve a probar el ejecutable publicado.
+- Un post-probe fallido deja el receipt en `PLANNED`: no escribe checkpoints `INSTALLED`, `CONFIGURED` ni `VERIFIED`.
+- Gates:
+  - `pnpm test:powershell`: `157/157`.
+  - `pnpm test:all`: `109/109`.
+  - `pnpm validate`: `PASS`.
+  - `pnpm sanitize:check`: `PASS`.
+  - `pnpm docs:check`: `PASS`.
+  - `git diff --check`: `PASS`.
+- Review: `PENDING RE-REVIEW`; no se inició Task 8.
 
 ## Decisiones
 
