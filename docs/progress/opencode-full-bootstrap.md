@@ -203,6 +203,28 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
   - `git diff --check`: `PASS`.
 - Review: `PENDING RE-REVIEW`; no se inició Task 8.
 
+### 2026-06-20 — Task 7, segunda remediación de Spec
+
+- Status: `in_progress`; los dos hallazgos HIGH de resolución Windows fueron remediados y quedan pendientes de re-review.
+- Commit de implementación: `3d88720`.
+- TDD RED inicial: `15/18` passed; se reprodujeron selección accidental del shim `opencode.ps1`, uso del Graphify viejo que antecedía en `PATH` y falta del seam de resolución determinística en Verification.
+- TDD RED adicional: `0/1`; el probe funcional `graphify.query` todavía usaba el nombre ambiguo de PATH. RED de ownership: `0/1`; el lock aún declaraba `command:graphify`.
+- Diseño aplicado:
+  - `Resolve-SafeWindowsCommand` solo acepta `.exe` o `.cmd`, prioriza `.exe` y luego `.cmd`, y nunca entrega `.ps1` a `ProcessRunner`.
+  - OpenCode usa esa misma resolución antes y después de instalar y durante `opencode.version`.
+  - Graphify obtiene el directorio user-owned oficial con `uv tool dir --bin` y usa el path absoluto `<uv-tool-bin>/graphify.exe` para detección, post-probe, `graphify.version` y `graphify.query`.
+  - La ruta se deriva nuevamente en futuras sesiones; no se modifica PATH ni un directorio administrado por OpenCode. El lock declara `uv-tool-bin:graphify.exe` como target owned.
+- Evidencia hermética: layout con `opencode.ps1` descubierto antes que `opencode.cmd`, y colisión PATH real con Graphify `0.8.39` antes que el bin uv-owned; el runtime efectivo y verificado quedó en `0.8.41`.
+- TDD GREEN focalizado final: `21/21`.
+- Gates:
+  - `pnpm test:powershell`: `163/163`.
+  - `pnpm test:all`: `109/109`.
+  - `pnpm validate`: `PASS`.
+  - `pnpm sanitize:check`: `PASS`.
+  - `pnpm docs:check`: `PASS`.
+  - `git diff --check`: `PASS`.
+- Review: `PENDING RE-REVIEW`; no se inició Task 8.
+
 ## Decisiones
 
 - Engram `1.16.3` está habilitado mediante asset Windows amd64 versionado, checksum oficial y verificación local previa a publicación.
