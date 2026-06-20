@@ -50,6 +50,38 @@ Describe 'install command core sequence' {
         $document.state | Should -Be 'CANCELED'
         $document.coreResult | Should -BeNullOrEmpty
     }
+
+    It 'loads a compatible receipt on Resume and does not repeat already VERIFIED phases' {
+        $versions = @{ git='2.53.0'; node='22.17.0'; pnpm='11.8.0'; python='3.13.5'; uv='0.11.14'; opencode='1.17.8'; engram='1.16.3'; graphify='0.8.41'; winget=$null }
+        $resolver = { param($id) [pscustomobject]@{ Present=$true; Usable=$true; Version=$versions[$id] } }.GetNewClosure()
+        $root=Join-Path $TestDrive 'resume-kit'; $first=[Collections.Generic.List[string]]::new(); $second=[Collections.Generic.List[string]]::new()
+        $executor1={param($c,$p);$first.Add("$($c.id):$p");[pscustomobject]@{Success=$true;Evidence=$p}}.GetNewClosure()
+        $null=& (Join-Path $repoRoot 'installer/commands/install.ps1') -Root $repoRoot -Json -KitRoot $root -CommandResolver $resolver -NonInteractive -ConfirmInstall -CoreExecutor $executor1 -CoreVerifier { [pscustomobject]@{Status='PASS'} }
+        $executor2={param($c,$p);$second.Add("$($c.id):$p");[pscustomobject]@{Success=$true;Evidence=$p}}.GetNewClosure()
+        $json=& (Join-Path $repoRoot 'installer/commands/install.ps1') -Root $repoRoot -Json -KitRoot $root -CommandResolver $resolver -NonInteractive -ConfirmInstall -Resume -CoreExecutor $executor2 -CoreVerifier { [pscustomobject]@{Status='PASS'} }
+        $document=$json|ConvertFrom-Json -Depth 20
+        $first.Count | Should -Be 6
+        $second.Count | Should -Be 0
+        $document.coreResult.Status | Should -Be 'COMPLETED'
+    }
+
+    It 'fails Resume with stable errors when the receipt is missing or corrupt' {
+        $versions = @{ git='2.53.0'; node='22.17.0'; pnpm='11.8.0'; python='3.13.5'; uv='0.11.14'; opencode='1.17.8'; engram='1.16.3'; graphify='0.8.41'; winget=$null }
+        $resolver = { param($id) [pscustomobject]@{ Present=$true; Usable=$true; Version=$versions[$id] } }.GetNewClosure()
+        $missing=Join-Path $TestDrive 'resume-missing'
+        { & (Join-Path $repoRoot 'installer/commands/install.ps1') -Root $repoRoot -Json -KitRoot $missing -CommandResolver $resolver -NonInteractive -ConfirmInstall -Resume } | Should -Throw 'RESUME_RECEIPT_NOT_FOUND*'
+        $corrupt=Join-Path $TestDrive 'resume-corrupt'; New-Item -ItemType Directory (Join-Path $corrupt 'state')|Out-Null; Set-Content (Join-Path $corrupt 'state/install-receipt.json') '{bad'
+        { & (Join-Path $repoRoot 'installer/commands/install.ps1') -Root $repoRoot -Json -KitRoot $corrupt -CommandResolver $resolver -NonInteractive -ConfirmInstall -Resume } | Should -Throw 'RESUME_RECEIPT_INVALID*'
+    }
+
+    It 'rejects a Resume receipt from a different lock' {
+        $versions = @{ git='2.53.0'; node='22.17.0'; pnpm='11.8.0'; python='3.13.5'; uv='0.11.14'; opencode='1.17.8'; engram='1.16.3'; graphify='0.8.41'; winget=$null }
+        $resolver = { param($id) [pscustomobject]@{ Present=$true; Usable=$true; Version=$versions[$id] } }.GetNewClosure()
+        $root=Join-Path $TestDrive 'resume-incompatible';$state=Join-Path $root 'state';New-Item -ItemType Directory $state|Out-Null
+        $receipt=New-InstallReceipt -KitVersion ([string]$lock.kitVersion) -LockDigest ('b'*64) -SourceCommit test
+        Save-InstallReceipt $receipt (Join-Path $state 'install-receipt.json') $state
+        { & (Join-Path $repoRoot 'installer/commands/install.ps1') -Root $repoRoot -Json -KitRoot $root -CommandResolver $resolver -NonInteractive -ConfirmInstall -Resume } | Should -Throw 'RESUME_RECEIPT_INCOMPATIBLE:lockDigest*'
+    }
 }
 
 Describe 'pinned core component lock' {
@@ -200,6 +232,15 @@ Describe 'CoreComponents installer' {
         } } | Should -Throw 'COMPONENT_VERSION_MISMATCH:opencode:expected:1.17.8:actual:1.17.7*'
     }
 
+    It 'never invokes unresolved or ps1-only package commands and verification shims' {
+        $calls=[Collections.Generic.List[string]]::new(); $process={param($file,$arguments);$calls.Add([string]$file);[pscustomobject]@{ExitCode=0;StdOut='';StdErr=''}}.GetNewClosure()
+        { Install-CoreComponent -Component ($lock.components|Where-Object id -CEQ 'opencode') -KitRoot $TestDrive -CommandResolver {param($name);if($name -ceq 'pnpm'){@('pnpm.ps1')}else{@()}} -ProcessInvoker $process } | Should -Throw 'CORE_COMMAND_UNRESOLVED:pnpm*'
+        { Install-CoreComponent -Component ($lock.components|Where-Object id -CEQ 'graphify') -KitRoot $TestDrive -CommandResolver {param($name);if($name -ceq 'uv'){@('uv.ps1')}else{@()}} -ProcessInvoker $process } | Should -Throw 'CORE_COMMAND_UNRESOLVED:uv*'
+        (Invoke-VerificationId -Id 'opencode.version' -ExpectedVersion '1.17.8' -CommandResolver { @('opencode.ps1') } -ProcessInvoker $process).ErrorCode | Should -Be 'VERIFICATION_COMMAND_UNRESOLVED'
+        (Invoke-VerificationId -Id 'graphify.version' -ExpectedVersion '0.8.41' -CommandResolver {param($name);if($name -ceq 'uv'){@('uv.ps1')}else{@('graphify.exe')}} -ProcessInvoker $process).ErrorCode | Should -Be 'VERIFICATION_COMMAND_UNRESOLVED'
+        $calls.Count | Should -Be 0
+    }
+
     It 'does not checkpoint INSTALLED or VERIFIED when the post-install version probe mismatches' {
         $component = $lock.components | Where-Object id -CEQ 'opencode' | ConvertTo-Json -Depth 20 | ConvertFrom-Json -Depth 20
         $component.dependencies = @()
@@ -252,6 +293,39 @@ Describe 'CoreComponents installer' {
         $result=Install-CoreComponent -Component $component -KitRoot $root -Downloader $downloader -ProcessInvoker $process
         $result.Action | Should -Be 'UPDATE_TO_PINNED'
         (Get-Content -Raw (Join-Path $bin 'engram.exe')) | Should -Be 'new'
+    }
+
+    It 'persists an Engram backup before publish and restores it after a failed post-probe' {
+        $root=Join-Path $TestDrive 'engram-transaction';$bin=Join-Path $root 'bin';New-Item -ItemType Directory $bin|Out-Null;$target=Join-Path $bin 'engram.exe';Set-Content $target 'old' -NoNewline
+        $payload=Join-Path $TestDrive 'transaction-payload';New-Item -ItemType Directory $payload|Out-Null;Set-Content (Join-Path $payload 'engram.exe') 'new' -NoNewline
+        $archive=Join-Path $TestDrive 'transaction.zip';Compress-Archive (Join-Path $payload 'engram.exe') $archive
+        $component=$lock.components|Where-Object id -CEQ 'engram'|ConvertTo-Json -Depth 10|ConvertFrom-Json;$component.source.sha256=(Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+        $probe=[pscustomobject]@{Count=0;ReceiptSeen=$false};$receiptPath=Join-Path $root 'state/install-receipt.json'
+        $process={param($file,$arguments);$probe.Count++;if($probe.Count -eq 3){$probe.ReceiptSeen=Test-Path $receiptPath};[pscustomobject]@{ExitCode=0;StdOut=$(if($probe.Count -eq 1){'engram 1.16.2'}elseif($probe.Count -eq 2){'engram 1.16.3'}else{'engram 1.16.2'});StdErr=''}}.GetNewClosure()
+        { Install-CoreComponent -Component $component -KitRoot $root -Downloader {param($u,$d)Copy-Item $archive $d} -ProcessInvoker $process } | Should -Throw 'COMPONENT_VERSION_MISMATCH:engram:expected:1.16.3:actual:1.16.2*'
+        $probe.ReceiptSeen | Should -BeTrue
+        (Get-Content -Raw $target) | Should -Be 'old'
+        $receipt=Get-Content -Raw $receiptPath|ConvertFrom-Json -Depth 20
+        $receipt.backups.Count | Should -Be 1
+        $receipt.backups[0].existed | Should -BeTrue
+        Test-Path $receipt.backups[0].backupPath | Should -BeTrue
+    }
+
+    It 'removes a newly published Engram when its post-probe fails' {
+        $root=Join-Path $TestDrive 'engram-new-rollback';$payload=Join-Path $TestDrive 'new-rollback-payload';New-Item -ItemType Directory $payload|Out-Null;Set-Content (Join-Path $payload 'engram.exe') 'new'
+        $archive=Join-Path $TestDrive 'new-rollback.zip';Compress-Archive (Join-Path $payload 'engram.exe') $archive
+        $component=$lock.components|Where-Object id -CEQ 'engram'|ConvertTo-Json -Depth 10|ConvertFrom-Json;$component.source.sha256=(Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant();$probe=[pscustomobject]@{Count=0}
+        $process={param($f,$a);$probe.Count++;[pscustomobject]@{ExitCode=0;StdOut=$(if($probe.Count -eq 1){'engram 1.16.3'}else{'engram 1.16.2'});StdErr=''}}.GetNewClosure()
+        { Install-CoreComponent -Component $component -KitRoot $root -Downloader {param($u,$d)Copy-Item $archive $d} -ProcessInvoker $process } | Should -Throw 'COMPONENT_VERSION_MISMATCH:engram*'
+        Test-Path (Join-Path $root 'bin/engram.exe') | Should -BeFalse
+    }
+
+    It 'rejects a junctioned Engram bin without writing outside KitRoot' {
+        $root=Join-Path $TestDrive 'junction-kit';$outside=Join-Path $TestDrive 'outside';New-Item -ItemType Directory $root,$outside|Out-Null;New-Item -ItemType Junction -Path (Join-Path $root 'bin') -Target $outside|Out-Null
+        $payload=Join-Path $TestDrive 'junction-payload';New-Item -ItemType Directory $payload|Out-Null;Set-Content (Join-Path $payload 'engram.exe') 'new';$archive=Join-Path $TestDrive 'junction.zip';Compress-Archive (Join-Path $payload 'engram.exe') $archive
+        $component=$lock.components|Where-Object id -CEQ 'engram'|ConvertTo-Json -Depth 10|ConvertFrom-Json;$component.source.sha256=(Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+        { Install-CoreComponent -Component $component -KitRoot $root -Downloader {param($u,$d)Copy-Item $archive $d} -ProcessInvoker { [pscustomobject]@{ExitCode=0;StdOut='engram 1.16.3';StdErr=''} } } | Should -Throw '*PATH_OUTSIDE*'
+        Test-Path (Join-Path $outside 'engram.exe') | Should -BeFalse
     }
 
     It 'verifies checksum before publishing and cleans failed staging' {

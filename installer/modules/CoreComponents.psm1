@@ -3,6 +3,8 @@ $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot 'ProcessRunner.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'CommandResolution.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'ConfigComposer.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'Receipt.psm1') -Force
 
 function Get-CoreComponentPreview {
     [CmdletBinding()]
@@ -45,6 +47,46 @@ function Assert-CoreVersion {
     }
 }
 
+function Add-CoreDirectoryLocks {
+    param([Collections.Generic.List[object]]$Destination,[object[]]$Source)
+    foreach ($entry in @($Source)) { $Destination.Add($entry) }
+}
+
+function Enter-CoreOwnedDirectory {
+    param([string]$Path,[string]$OwnershipRoot,[Collections.Generic.List[object]]$Locks)
+    $full=[IO.Path]::GetFullPath($Path)
+    if (Test-Path -LiteralPath $full) {
+        [void](Assert-ConfigPath -Path $full -Root $OwnershipRoot)
+        if (-not (Test-Path -LiteralPath $full -PathType Container)) { throw "CONFIG_PATH_OUTSIDE_ROOT:$full" }
+        Add-CoreDirectoryLocks $Locks (Enter-ConfigDirectoryLocks -Root $full -Parent $full -OpenReparsePoint)
+    }
+    else {
+        $anchor=Get-NearestExistingConfigDirectory $full
+        Add-CoreDirectoryLocks $Locks (New-SafeConfigDirectoryPath -Anchor $anchor -Target $full)
+        [void](Assert-ConfigPath -Path $full -Root $OwnershipRoot)
+    }
+    $full
+}
+
+function Assert-CoreOwnedFilePath {
+    param([string]$Path,[string]$OwnershipRoot,[switch]$AllowMissing)
+    [void](Assert-OwnedPath -Path $Path -AllowedRoots @($OwnershipRoot) -AllowMissing:$AllowMissing)
+    [void](Assert-ConfigPath -Path $Path -Root $OwnershipRoot)
+    [IO.Path]::GetFullPath($Path)
+}
+
+function Restore-CoreInstallBackup {
+    param([object]$Backup,[string]$Target,[string]$OwnershipRoot)
+    [void](Assert-CoreOwnedFilePath -Path $Target -OwnershipRoot $OwnershipRoot -AllowMissing)
+    if ($Backup.existed) {
+        [void](Assert-CoreOwnedFilePath -Path $Backup.backupPath -OwnershipRoot $OwnershipRoot)
+        [IO.File]::Copy([string]$Backup.backupPath,$Target,$true)
+        [void](Assert-CoreOwnedFilePath -Path $Target -OwnershipRoot $OwnershipRoot)
+        [void](Get-ConfigFileIdentity $Target)
+    }
+    elseif (Test-Path -LiteralPath $Target) { Remove-Item -LiteralPath $Target -Force }
+}
+
 function Install-CoreComponent {
     [CmdletBinding()]
     param(
@@ -52,7 +94,12 @@ function Install-CoreComponent {
         [Parameter(Mandatory)][string]$KitRoot,
         [scriptblock]$ProcessInvoker,
         [scriptblock]$Downloader,
-        [scriptblock]$CommandResolver
+        [scriptblock]$CommandResolver,
+        [object]$Receipt,
+        [string]$ReceiptPath,
+        [string]$ReceiptRoot,
+        [string]$BackupRoot,
+        [string]$BackupId
     )
     $id = [string]$Component.id
     if (@('opencode','engram','graphify') -cnotcontains $id) { throw "CORE_INSTALL_FAILED:$id`: unsupported core component" }
@@ -61,7 +108,7 @@ function Install-CoreComponent {
         $safeArgs = @{}
         if ($PSBoundParameters.ContainsKey('CommandResolver')) { $safeArgs.CommandResolver=$CommandResolver }
         $installPath = Resolve-SafeWindowsCommand -Name ([string]$Component.install.command) @safeArgs
-        if ([string]::IsNullOrWhiteSpace($installPath)) { $installPath = [string]$Component.install.command }
+        if ([string]::IsNullOrWhiteSpace($installPath)) { throw "CORE_COMMAND_UNRESOLVED:$([string]$Component.install.command)" }
         $uvPath = if ($id -ceq 'graphify') { $installPath } else { $null }
         $existingPath = if ($id -ceq 'opencode') {
             Resolve-SafeWindowsCommand -Name 'opencode' @safeArgs
@@ -71,6 +118,7 @@ function Install-CoreComponent {
             if ($PSBoundParameters.ContainsKey('CommandResolver')) { $toolArgs.CommandResolver=$CommandResolver }
             Resolve-UvToolExecutable @toolArgs
         }
+        if ($id -ceq 'graphify' -and [string]::IsNullOrWhiteSpace($uvPath)) { throw 'CORE_COMMAND_UNRESOLVED:uv' }
         $hadExisting = -not [string]::IsNullOrWhiteSpace([string]$existingPath)
         $previousVersion = $null
         if ($hadExisting) {
@@ -90,6 +138,7 @@ function Install-CoreComponent {
             if ($PSBoundParameters.ContainsKey('CommandResolver')) { $toolArgs.CommandResolver=$CommandResolver }
             Resolve-UvToolExecutable @toolArgs
         }
+        if ([string]::IsNullOrWhiteSpace([string]$installedPath)) { throw "CORE_COMMAND_UNRESOLVED:$id" }
         $installedVersion = Get-ProcessVersion -FilePath ([string]$installedPath) -Arguments @('--version') -ProcessInvoker $invoke
         Assert-CoreVersion -Id $id -ExpectedVersion ([string]$Component.version) -ActualVersion $installedVersion
         $action = if ($hadExisting) { 'UPDATE_TO_PINNED' } else { 'INSTALL_PINNED' }
@@ -97,39 +146,79 @@ function Install-CoreComponent {
     }
 
     $root = [IO.Path]::GetFullPath($KitRoot)
-    $bin = Join-Path $root 'bin'; $target = Join-Path $bin 'engram.exe'
-    $previousVersion = $null
-    if (Test-Path -LiteralPath $target) {
-        $previousVersion = Get-ProcessVersion -FilePath $target -Arguments @('version') -ProcessInvoker $invoke
-        if ($previousVersion -ceq [string]$Component.version) { return [pscustomobject][ordered]@{ Id=$id; Version=$previousVersion; Status='REUSED'; Action='REUSE_PINNED'; Target=$target } }
-    }
-    $stageRoot = Join-Path $root ('.staging/engram-' + [guid]::NewGuid().ToString('N'))
-    $archive = Join-Path $stageRoot 'engram.zip'; $extract = Join-Path $stageRoot 'extract'
-    $download = if ($PSBoundParameters.ContainsKey('Downloader')) { $Downloader } else { { param($Uri,$Destination) Invoke-WebRequest -Uri $Uri -OutFile $Destination -UseBasicParsing } }
+    $locks=[Collections.Generic.List[object]]::new()
+    $published=$false; $backupRecord=$null; $stageRoot=$null
     try {
-        New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
+        $root = Enter-CoreOwnedDirectory -Path $root -OwnershipRoot $root -Locks $locks
+        $bin = Enter-CoreOwnedDirectory -Path (Join-Path $root 'bin') -OwnershipRoot $root -Locks $locks
+        $target = Assert-CoreOwnedFilePath -Path (Join-Path $bin 'engram.exe') -OwnershipRoot $root -AllowMissing
+        $previousVersion = $null
+        if (Test-Path -LiteralPath $target) {
+            $previousVersion = Get-ProcessVersion -FilePath $target -Arguments @('version') -ProcessInvoker $invoke
+            if ($previousVersion -ceq [string]$Component.version) { return [pscustomobject][ordered]@{ Id=$id; Version=$previousVersion; Status='REUSED'; Action='REUSE_PINNED'; Target=$target } }
+        }
+        $stageParent=Enter-CoreOwnedDirectory -Path (Join-Path $root '.staging') -OwnershipRoot $root -Locks $locks
+        $stageRoot = Enter-CoreOwnedDirectory -Path (Join-Path $stageParent ('engram-' + [guid]::NewGuid().ToString('N'))) -OwnershipRoot $root -Locks $locks
+        $archive = Join-Path $stageRoot 'engram.zip'; $extract = Join-Path $stageRoot 'extract'
+        $download = if ($PSBoundParameters.ContainsKey('Downloader')) { $Downloader } else { { param($Uri,$Destination) Invoke-WebRequest -Uri $Uri -OutFile $Destination -UseBasicParsing } }
+        Assert-ConfigDirectoryLocksCurrent $locks
         & $download ([string]$Component.source.url) $archive
+        [void](Assert-CoreOwnedFilePath -Path $archive -OwnershipRoot $root)
         if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) { throw 'download did not create archive' }
         $actualHash = Get-FileSha256Core $archive
         if ($actualHash -cne [string]$Component.source.sha256) { throw "CHECKSUM_MISMATCH:engram:$actualHash" }
         Expand-Archive -LiteralPath $archive -DestinationPath $extract
-        $candidate = Join-Path $extract 'engram.exe'
+        $extract=Enter-CoreOwnedDirectory -Path $extract -OwnershipRoot $root -Locks $locks
+        $candidate = Assert-CoreOwnedFilePath -Path (Join-Path $extract 'engram.exe') -OwnershipRoot $root
         if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { throw 'archive missing engram.exe' }
+        $candidateBytes=[IO.File]::ReadAllBytes($candidate);$candidateIdentity=Get-ConfigFileIdentity $candidate
         $candidateVersion = Get-ProcessVersion -FilePath $candidate -Arguments @('version') -ProcessInvoker $invoke
         Assert-CoreVersion -Id $id -ExpectedVersion ([string]$Component.version) -ActualVersion $candidateVersion
-        New-Item -ItemType Directory -Path $bin -Force | Out-Null
+        $receiptValue = if ($PSBoundParameters.ContainsKey('Receipt')) { [void](Assert-InstallReceipt $Receipt); $Receipt } else {
+            New-InstallReceipt -KitVersion ("engram-"+[string]$Component.version) -LockDigest ([string]$Component.source.sha256) -SourceCommit 'core-direct'
+        }
+        $receiptRootValue = if ([string]::IsNullOrWhiteSpace($ReceiptRoot)) { Join-Path $root 'state' } else { [IO.Path]::GetFullPath($ReceiptRoot) }
+        $receiptRootValue=Enter-CoreOwnedDirectory -Path $receiptRootValue -OwnershipRoot $root -Locks $locks
+        $receiptPathValue = if ([string]::IsNullOrWhiteSpace($ReceiptPath)) { Join-Path $receiptRootValue 'install-receipt.json' } else { $ReceiptPath }
+        $receiptPathValue=Assert-CoreOwnedFilePath -Path $receiptPathValue -OwnershipRoot $root -AllowMissing
+        $backupRootValue = if ([string]::IsNullOrWhiteSpace($BackupRoot)) { Join-Path $root 'backups' } else { [IO.Path]::GetFullPath($BackupRoot) }
+        $backupRootValue=Enter-CoreOwnedDirectory -Path $backupRootValue -OwnershipRoot $root -Locks $locks
+        $backupIdValue = if ([string]::IsNullOrWhiteSpace($BackupId)) { [datetime]::UtcNow.ToString('yyyyMMddTHHmmssZ')+'-'+[guid]::NewGuid().ToString('N').Substring(0,8) } else { $BackupId }
+        [void](Assert-SafeBackupId $backupIdValue)
+        [void](Enter-CoreOwnedDirectory -Path (Join-Path $backupRootValue $backupIdValue) -OwnershipRoot $root -Locks $locks)
+        Assert-ConfigDirectoryLocksCurrent $locks
+        $targetBytes=if(Test-Path -LiteralPath $target -PathType Leaf){[IO.File]::ReadAllBytes($target)}else{$null}
+        $targetIdentity=if($null -ne $targetBytes){Get-ConfigFileIdentity $target}else{$null}
+        $backupRecord=Backup-InstallPath -Receipt $receiptValue -Path $target -BackupRoot $backupRootValue -BackupId $backupIdValue -AllowedRoots @($root)
+        if ($backupRecord.existed) { [void](Assert-CoreOwnedFilePath -Path $backupRecord.backupPath -OwnershipRoot $root) }
+        Assert-ConfigFileUnchanged -Path $target -OriginalBytes $targetBytes -OriginalIdentity $targetIdentity
+        Save-InstallReceipt -Receipt $receiptValue -Path $receiptPathValue -ReceiptRoot $receiptRootValue
+        [void](Assert-CoreOwnedFilePath -Path $receiptPathValue -OwnershipRoot $root)
+        Assert-ConfigDirectoryLocksCurrent $locks
+        Assert-ConfigFileUnchanged -Path $candidate -OriginalBytes $candidateBytes -OriginalIdentity $candidateIdentity
         [IO.File]::Move($candidate, $target, $true)
+        $published=$true
+        [void](Assert-CoreOwnedFilePath -Path $target -OwnershipRoot $root)
+        $publishedIdentity=Get-ConfigFileIdentity $target
         $installedVersion = Get-ProcessVersion -FilePath $target -Arguments @('version') -ProcessInvoker $invoke
         Assert-CoreVersion -Id $id -ExpectedVersion ([string]$Component.version) -ActualVersion $installedVersion
+        [void](Assert-CoreOwnedFilePath -Path $target -OwnershipRoot $root)
+        if ((Get-ConfigFileIdentity $target) -cne $publishedIdentity) { throw 'CONFIG_CONCURRENT_MODIFICATION:engram target identity' }
         $action = if ($null -ne $previousVersion) { 'UPDATE_TO_PINNED' } else { 'INSTALL_PINNED' }
         return [pscustomobject][ordered]@{ Id=$id; Version=$installedVersion; Status='INSTALLED'; Action=$action; Target=$target; PreviousVersion=$previousVersion; Sha256=$actualHash }
     }
     catch {
-        if ($_.Exception.Message -like 'CHECKSUM_MISMATCH:*' -or $_.Exception.Message -like 'COMPONENT_VERSION_MISMATCH:*') { throw $_.Exception }
-        throw "CORE_INSTALL_FAILED:engram: $($_.Exception.Message)"
+        $failure=$_.Exception
+        if ($published -and $null -ne $backupRecord) {
+            try { Restore-CoreInstallBackup -Backup $backupRecord -Target $target -OwnershipRoot $root }
+            catch { throw "CORE_ROLLBACK_FAILED:engram:$($failure.Message):$($_.Exception.Message)" }
+        }
+        if ($failure.Message -like 'CHECKSUM_MISMATCH:*' -or $failure.Message -like 'COMPONENT_VERSION_MISMATCH:*') { throw $failure }
+        throw "CORE_INSTALL_FAILED:engram: $($failure.Message)"
     }
     finally {
-        if (Test-Path -LiteralPath $stageRoot) { Remove-Item -LiteralPath $stageRoot -Recurse -Force -ErrorAction SilentlyContinue }
+        if ($null -ne $stageRoot -and (Test-Path -LiteralPath $stageRoot)) { Remove-Item -LiteralPath $stageRoot -Recurse -Force -ErrorAction SilentlyContinue }
+        foreach($entry in $locks){$entry.Handle.Dispose()}
     }
 }
 

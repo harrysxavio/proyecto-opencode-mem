@@ -36,6 +36,11 @@ Import-Module (Join-Path $installerRoot 'modules/Receipt.psm1') -Force
 Import-Module (Join-Path $installerRoot 'modules/Verification.psm1') -Force
 Import-Module (Join-Path $installerRoot 'modules/CommandResolution.psm1') -Force
 $lock = Read-ComponentLock -Path (Join-Path $installerRoot 'components.lock.json')
+$lockDigest = (Get-FileHash -LiteralPath (Join-Path $installerRoot 'components.lock.json') -Algorithm SHA256).Hash.ToLowerInvariant()
+$kitFullRoot = [IO.Path]::GetFullPath($KitRoot)
+$receiptRoot = Join-Path $kitFullRoot 'state'
+$receiptPath = Join-Path $receiptRoot 'install-receipt.json'
+$backupRoot = Join-Path $kitFullRoot 'backups'
 $core = @($lock.components | Where-Object { $_.id -cin @('opencode','engram','graphify') } | ForEach-Object {
     $copy = $_ | ConvertTo-Json -Depth 30 -Compress | ConvertFrom-Json -Depth 30
     $copy.dependencies = @($copy.dependencies | Where-Object { $_ -cin @('opencode','engram','graphify') })
@@ -71,15 +76,23 @@ if ($PSBoundParameters.ContainsKey('PathRefresher')) { $installArgs.PathRefreshe
 $result = Invoke-ConfirmedPrerequisiteInstall @installArgs
 $coreResult = $null
 if ($result.Status -ceq 'COMPLETED' -and $result.InstallApproved) {
-    $receipt = if ($PSBoundParameters.ContainsKey('CoreReceipt')) { $CoreReceipt } else {
-        $digest = (Get-FileHash -LiteralPath (Join-Path $installerRoot 'components.lock.json') -Algorithm SHA256).Hash.ToLowerInvariant()
-        New-InstallReceipt -KitVersion ([string]$lock.kitVersion) -LockDigest $digest -SourceCommit 'workspace'
+    $receipt = if ($Resume) {
+        if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) { throw "RESUME_RECEIPT_NOT_FOUND:$receiptPath" }
+        try { Read-InstallReceipt -Path $receiptPath -ReceiptRoot $receiptRoot -AllowedRoots @($kitFullRoot) -BackupRoot $backupRoot }
+        catch { throw "RESUME_RECEIPT_INVALID:$($_.Exception.Message)" }
     }
+    elseif ($PSBoundParameters.ContainsKey('CoreReceipt')) {
+        [void](Assert-InstallReceipt $CoreReceipt)
+        $CoreReceipt
+    }
+    else { New-InstallReceipt -KitVersion ([string]$lock.kitVersion) -LockDigest $lockDigest -SourceCommit 'workspace' }
+    if ($Resume -and [string]$receipt.kitVersion -cne [string]$lock.kitVersion) { throw 'RESUME_RECEIPT_INCOMPATIBLE:kitVersion' }
+    if ($Resume -and [string]$receipt.provenance.lockDigest -cne $lockDigest) { throw 'RESUME_RECEIPT_INCOMPATIBLE:lockDigest' }
     $executor = if ($PSBoundParameters.ContainsKey('CoreExecutor')) { $CoreExecutor } else {
         {
             param($Component,$Phase)
             if ($Phase -ceq 'Configure') { return [pscustomobject]@{ Success=$true; Evidence='no configuration required' } }
-            $args = @{ Component=$Component; KitRoot=$KitRoot }
+            $args = @{ Component=$Component; KitRoot=$KitRoot; Receipt=$receipt; ReceiptPath=$receiptPath; ReceiptRoot=$receiptRoot; BackupRoot=$backupRoot }
             if ($null -ne $CoreProcessInvoker) { $args.ProcessInvoker = $CoreProcessInvoker }
             if ($null -ne $CoreDownloader) { $args.Downloader = $CoreDownloader }
             try { $installed = Install-CoreComponent @args; [pscustomobject]@{ Success=$true; Evidence=$installed } }
@@ -121,8 +134,6 @@ if ($result.Status -ceq 'COMPLETED' -and $result.InstallApproved) {
         }.GetNewClosure()
     }
     $checkpoint = if ($PSBoundParameters.ContainsKey('CoreCheckpointWriter')) { $CoreCheckpointWriter } else {
-        $receiptRoot = Join-Path ([IO.Path]::GetFullPath($KitRoot)) 'state'
-        $receiptPath = Join-Path $receiptRoot 'install-receipt.json'
         { param($candidate) Save-InstallReceipt -Receipt $candidate -Path $receiptPath -ReceiptRoot $receiptRoot | Out-Null }.GetNewClosure()
     }
     $coreResult = Invoke-ComponentPlan -Components $core -Receipt $receipt -Executor $executor -Verifier $verifier -CheckpointWriter $checkpoint

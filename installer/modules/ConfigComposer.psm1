@@ -526,6 +526,7 @@ function Assert-ConfigDirectoryLocksCurrent {
         if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'CONFIG_CONCURRENT_MODIFICATION:directory reparse' }
         $current = (Resolve-Path -LiteralPath $entry.Path).Path
         if (-not $current.Equals($entry.Identity, [StringComparison]::OrdinalIgnoreCase)) { throw 'CONFIG_CONCURRENT_MODIFICATION:directory identity' }
+        if ((Get-ConfigDirectoryIdentitySnapshot $entry.Path) -cne $entry.FileIdentity) { throw 'CONFIG_CONCURRENT_MODIFICATION:directory file identity' }
     }
 }
 
@@ -545,6 +546,7 @@ function Get-ConfigFileIdentity {
         if (-not [CodexKit.Config.NativeDirectoryLock]::GetFileInformationByHandle($stream.SafeFileHandle, [ref]$information)) {
             throw "CONFIG_FILE_IDENTITY_UNAVAILABLE:$([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
         }
+        if (($information.Attributes -band 0x400) -ne 0) { throw "CONFIG_PATH_OUTSIDE_ROOT:$Path" }
         return '{0:x8}:{1:x8}:{2:x8}' -f $information.VolumeSerialNumber, $information.FileIndexHigh, $information.FileIndexLow
     }
     finally { $stream.Dispose() }
@@ -701,4 +703,4 @@ function Write-OpenCodeConfig {
     }
 }
 
-Export-ModuleMember -Function ConvertFrom-Jsonc, Merge-OpenCodeConfig, Write-OpenCodeConfig
+Export-ModuleMember -Function ConvertFrom-Jsonc, Merge-OpenCodeConfig, Write-OpenCodeConfig, Assert-ConfigPath, Get-NearestExistingConfigDirectory, Enter-ConfigDirectoryLocks, Get-ConfigDirectoryIdentitySnapshot, New-SafeConfigDirectoryPath, Assert-ConfigDirectoryLocksCurrent, Get-ConfigFileIdentity, Assert-ConfigFileUnchanged
