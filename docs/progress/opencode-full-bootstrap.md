@@ -253,6 +253,31 @@ Completar el bootstrap full de OpenCode con trazabilidad versionada de tareas, p
   - `git diff --check`: `PASS`.
 - Review: `PENDING RE-REVIEW`; no se inició Task 8.
 
+### 2026-06-20 — Task 7, segunda remediación de Quality
+
+- Status: `in_progress`; los tres hallazgos de la re-revisión Quality fueron remediados y quedan pendientes de validación independiente.
+- Commit de implementación: `6c1dbb1`.
+- TDD RED: `26/28` passed; se comprobó que un Resume inválido ejecutaba 14 resoluciones antes de fallar y que un `ReceiptRoot`/`BackupRoot` externo inexistente era creado antes del rechazo.
+- TDD GREEN focalizado: `28/28`.
+- Validación temprana de Resume:
+  - localiza, lee y valida el schema del receipt canónico antes de construir previews, ejecutar preflight, pedir confirmación o invocar runners;
+  - verifica `kitVersion` y lock digest en esa misma fase, por lo que missing/corrupt/incompatible producen cero llamadas a resolver, confirmar, instalar prerrequisitos o ejecutar core.
+- Ownership previo a efectos:
+  - toda entrada a directorios core aplica contención léxica con `Assert-OwnedPath -AllowMissing` antes de buscar el ancestro existente o crear segmentos;
+  - raíces externas inexistentes se rechazan sin crearlas.
+- Restore atómico:
+  - copia el backup a un temporal único dentro del directorio validado del target con `WriteThrough` y `Flush(true)`;
+  - valida SHA-256 antes de `File.Replace`/`File.Move`, y vuelve a validar identidad y hash del target publicado;
+  - ante fallo de reemplazo conserva target, receipt y backup recuperables y limpia temporales de restore.
+- Gates:
+  - `pnpm test:powershell`: `173/173`.
+  - `pnpm test:all`: `109/109`.
+  - `pnpm validate`: `PASS`.
+  - `pnpm sanitize:check`: `PASS`.
+  - `pnpm docs:check`: `PASS`.
+  - `git diff --check`: `PASS`.
+- Review: `PENDING RE-REVIEW`; no se inició Task 8.
+
 ## Decisiones
 
 - Engram `1.16.3` está habilitado mediante asset Windows amd64 versionado, checksum oficial y verificación local previa a publicación.
