@@ -69,7 +69,7 @@ if ($PSBoundParameters.ContainsKey('ExecutableResolver')) { $installArgs.Executa
 if ($PSBoundParameters.ContainsKey('PathRefresher')) { $installArgs.PathRefresher = $PathRefresher }
 $result = Invoke-ConfirmedPrerequisiteInstall @installArgs
 $coreResult = $null
-if ($result.Status -ceq 'COMPLETED' -and $ConfirmInstall) {
+if ($result.Status -ceq 'COMPLETED' -and $result.InstallApproved) {
     $receipt = if ($PSBoundParameters.ContainsKey('CoreReceipt')) { $CoreReceipt } else {
         $digest = (Get-FileHash -LiteralPath (Join-Path $installerRoot 'components.lock.json') -Algorithm SHA256).Hash.ToLowerInvariant()
         New-InstallReceipt -KitVersion ([string]$lock.kitVersion) -LockDigest $digest -SourceCommit 'workspace'

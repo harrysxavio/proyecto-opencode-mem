@@ -5,6 +5,7 @@ BeforeAll {
     Import-Module (Join-Path $repoRoot 'installer/modules/LockManifest.psm1') -Force
     Import-Module (Join-Path $repoRoot 'installer/modules/CoreComponents.psm1') -Force
     Import-Module (Join-Path $repoRoot 'installer/modules/Verification.psm1') -Force
+    Import-Module (Join-Path $repoRoot 'installer/modules/ComponentRunner.psm1') -Force
     Import-Module (Join-Path $repoRoot 'installer/modules/Receipt.psm1') -Force
     $lock = Read-ComponentLock -Path (Join-Path $repoRoot 'installer/components.lock.json')
     $fixture = Join-Path $repoRoot 'installer/tests/e2e/fixtures/graphify/sample.js'
@@ -22,6 +23,32 @@ Describe 'install command core sequence' {
         $coreCalls | Should -Be @('opencode:Install','opencode:Configure','engram:Install','engram:Configure','graphify:Install','graphify:Configure')
         $checkpointCounter.Value | Should -Be 12
         @($receipt.components | ForEach-Object state | Select-Object -Unique) | Should -Be @('VERIFIED')
+    }
+
+    It 'runs core exactly once after one interactive approval and reports the core result' {
+        $versions = @{ git='2.53.0'; node='22.17.0'; pnpm='11.8.0'; python='3.13.5'; uv='0.11.14'; opencode='1.17.8'; engram='1.16.3'; graphify='0.8.41'; winget=$null }
+        $resolver = { param($id) [pscustomobject]@{ Present=$true; Usable=$true; Version=$versions[$id] } }.GetNewClosure()
+        $receipt = New-InstallReceipt -KitVersion '0.2.0-rc.1' -LockDigest ('a' * 64) -SourceCommit 'test'
+        $calls=[Collections.Generic.List[string]]::new(); $answers=[pscustomobject]@{ Count=0 }
+        $executor={ param($c,$p); if($p -eq 'Install'){$calls.Add($c.id)}; [pscustomobject]@{Success=$true;Evidence=$p} }.GetNewClosure()
+        $reader={ $answers.Count++; 'INSTALL' }.GetNewClosure()
+        $json = & (Join-Path $repoRoot 'installer/commands/install.ps1') -Root $repoRoot -Json -KitRoot (Join-Path $TestDrive 'approved') -CommandResolver $resolver -ConfirmationReader $reader -CoreReceipt $receipt -CoreExecutor $executor -CoreVerifier { [pscustomobject]@{Status='PASS'} } -CoreCheckpointWriter { param($candidate) }
+        $document=$json|ConvertFrom-Json -Depth 20
+        $answers.Count | Should -Be 1
+        $calls | Should -Be @('opencode','engram','graphify')
+        $document.state | Should -Be 'COMPLETED'
+        $document.coreResult.Status | Should -Be 'COMPLETED'
+    }
+
+    It 'does not run core after interactive cancellation' {
+        $versions = @{ git='2.53.0'; node='22.17.0'; pnpm='11.8.0'; python='3.13.5'; uv='0.11.14'; opencode='1.17.8'; engram='1.16.3'; graphify='0.8.41'; winget=$null }
+        $resolver = { param($id) [pscustomobject]@{ Present=$true; Usable=$true; Version=$versions[$id] } }.GetNewClosure()
+        $calls=[Collections.Generic.List[string]]::new(); $executor={ param($c,$p); $calls.Add($c.id); [pscustomobject]@{Success=$true} }.GetNewClosure()
+        $json = & (Join-Path $repoRoot 'installer/commands/install.ps1') -Root $repoRoot -Json -KitRoot (Join-Path $TestDrive 'cancel') -CommandResolver $resolver -ConfirmationReader { 'NO' } -CoreExecutor $executor
+        $document=$json|ConvertFrom-Json -Depth 20
+        $calls.Count | Should -Be 0
+        $document.state | Should -Be 'CANCELED'
+        $document.coreResult | Should -BeNullOrEmpty
     }
 }
 
@@ -51,12 +78,13 @@ Describe 'CoreComponents installer' {
     It 'uses exact argument arrays for OpenCode and Graphify' {
         foreach ($id in @('opencode','graphify')) {
             $component = $lock.components | Where-Object id -CEQ $id
-            (Install-CoreComponent -Component $component -KitRoot $TestDrive -ProcessInvoker $script:process -CommandResolver { $null }).Status | Should -Be 'INSTALLED'
+            $state=[pscustomobject]@{ Calls=0 }; $resolver={ param($name); $state.Calls++; if($state.Calls -gt 1){ "$name.exe" } }.GetNewClosure()
+            $callList=$script:calls
+            $process={ param($file,$arguments); $callList.Add([pscustomobject]@{FilePath=$file;Arguments=[string[]]@($arguments)}); if($arguments[0] -eq '--version'){ [pscustomobject]@{ExitCode=0;StdOut="$id $($component.version)";StdErr=''} } else { [pscustomobject]@{ExitCode=0;StdOut='';StdErr=''} } }.GetNewClosure()
+            (Install-CoreComponent -Component $component -KitRoot $TestDrive -ProcessInvoker $process -CommandResolver $resolver).Status | Should -Be 'INSTALLED'
         }
-        $script:calls[0].FilePath | Should -Be 'pnpm'
-        $script:calls[0].Arguments | Should -Be @('add','--global','opencode-ai@1.17.8')
-        $script:calls[1].FilePath | Should -Be 'uv'
-        $script:calls[1].Arguments | Should -Be @('tool','install','graphifyy==0.8.41')
+        @($script:calls | Where-Object FilePath -EQ 'pnpm')[0].Arguments | Should -Be @('add','--global','opencode-ai@1.17.8')
+        @($script:calls | Where-Object FilePath -EQ 'uv')[0].Arguments | Should -Be @('tool','install','graphifyy==0.8.41')
     }
 
     It 'reuses exact compatible package tools and reinstalls a detected mismatch at the pin' {
@@ -66,14 +94,53 @@ Describe 'CoreComponents installer' {
         $exact.Status | Should -Be 'REUSED'
 
         $script:mismatchCalls = [Collections.Generic.List[object]]::new()
+        $mismatchCalls=$script:mismatchCalls
+        $probe=[pscustomobject]@{ Count=0 }
         $mismatch = Install-CoreComponent -Component ($lock.components | Where-Object id -CEQ 'graphify') -KitRoot $TestDrive -CommandResolver { 'graphify.exe' } -ProcessInvoker {
-            param($file,$arguments); $script:mismatchCalls.Add(@($arguments));
-            if ($arguments[0] -eq '--version') { [pscustomobject]@{ ExitCode=0; StdOut='graphify 0.8.40'; StdErr='' } }
+            param($file,$arguments); $mismatchCalls.Add(@($arguments));
+            if ($arguments[0] -eq '--version') { $probe.Count++; [pscustomobject]@{ ExitCode=0; StdOut=$(if($probe.Count -eq 1){'graphify 0.8.40'}else{'graphify 0.8.41'}); StdErr='' } }
             else { [pscustomobject]@{ ExitCode=0; StdOut='installed'; StdErr='' } }
-        }
+        }.GetNewClosure()
         $mismatch.Status | Should -Be 'INSTALLED'
+        $mismatch.Action | Should -Be 'UPDATE_TO_PINNED'
         $mismatch.PreviousVersion | Should -Be '0.8.40'
         $script:mismatchCalls[1] | Should -Be @('tool','install','graphifyy==0.8.41')
+    }
+
+    It 'fails closed when a pinned package install does not produce the exact version' {
+        { Install-CoreComponent -Component ($lock.components | Where-Object id -CEQ 'opencode') -KitRoot $TestDrive -CommandResolver { 'opencode.exe' } -ProcessInvoker {
+            param($file,$arguments); if($arguments[0] -eq '--version'){[pscustomobject]@{ExitCode=0;StdOut='opencode 1.17.7';StdErr=''}}else{[pscustomobject]@{ExitCode=0;StdOut='installed';StdErr=''}}
+        } } | Should -Throw 'COMPONENT_VERSION_MISMATCH:opencode:expected:1.17.8:actual:1.17.7*'
+    }
+
+    It 'does not checkpoint INSTALLED or VERIFIED when the post-install version probe mismatches' {
+        $component = $lock.components | Where-Object id -CEQ 'opencode' | ConvertTo-Json -Depth 20 | ConvertFrom-Json -Depth 20
+        $component.dependencies = @()
+        $receipt = New-InstallReceipt -KitVersion '0.2.0-rc.1' -LockDigest ('a' * 64) -SourceCommit 'test'
+        $checkpoints = [Collections.Generic.List[string]]::new()
+        $executor = {
+            param($candidate,$phase)
+            if ($phase -ceq 'Configure') { return [pscustomobject]@{ Success=$true; Evidence='configured' } }
+            try {
+                $evidence = Install-CoreComponent -Component $candidate -KitRoot $TestDrive -CommandResolver { 'opencode.exe' } -ProcessInvoker {
+                    param($file,$arguments)
+                    if ($arguments[0] -ceq '--version') { [pscustomobject]@{ ExitCode=0; StdOut='opencode 1.17.7'; StdErr='' } }
+                    else { [pscustomobject]@{ ExitCode=0; StdOut='installed'; StdErr='' } }
+                }
+                [pscustomobject]@{ Success=$true; Evidence=$evidence }
+            }
+            catch { [pscustomobject]@{ Success=$false; Evidence=$_.Exception.Message } }
+        }.GetNewClosure()
+        $result = Invoke-ComponentPlan -Components @($component) -Receipt $receipt -Executor $executor -Verifier { [pscustomobject]@{ Status='PASS' } } -CheckpointWriter {
+            param($candidate)
+            $state = @($candidate.components | Where-Object id -CEQ 'opencode')[0].state
+            $checkpoints.Add($state)
+        }.GetNewClosure()
+
+        $result.Status | Should -Be 'FAILED'
+        $result.Evidence | Should -BeLike 'COMPONENT_VERSION_MISMATCH:opencode:expected:1.17.8:actual:1.17.7*'
+        $checkpoints | Should -Be @('PLANNED')
+        @($receipt.components | Where-Object id -CEQ 'opencode')[0].state | Should -Be 'PLANNED'
     }
 
     It 'reuses an exact existing Engram and does not download' {
@@ -87,11 +154,17 @@ Describe 'CoreComponents installer' {
         (Get-Content -Raw (Join-Path $bin 'engram.exe')) | Should -Be 'existing'
     }
 
-    It 'rejects an existing Engram version mismatch without overwrite' {
+    It 'updates an existing Engram mismatch only after the pinned archive verifies' {
         $root = Join-Path $TestDrive 'mismatch'; $bin = Join-Path $root 'bin'; New-Item -ItemType Directory $bin -Force | Out-Null
         Set-Content -LiteralPath (Join-Path $bin 'engram.exe') -Value 'old' -NoNewline
-        { Install-CoreComponent -Component ($lock.components | Where-Object id -CEQ 'engram') -KitRoot $root -ProcessInvoker { [pscustomobject]@{ ExitCode=0; StdOut='engram 1.16.2'; StdErr='' } } } | Should -Throw 'CORE_INSTALL_FAILED:engram*'
-        (Get-Content -Raw (Join-Path $bin 'engram.exe')) | Should -Be 'old'
+        $payload=Join-Path $TestDrive 'mismatch-payload'; New-Item -ItemType Directory $payload|Out-Null; Set-Content -LiteralPath (Join-Path $payload 'engram.exe') -Value 'new' -NoNewline
+        $archive=Join-Path $TestDrive 'mismatch.zip'; Compress-Archive -Path (Join-Path $payload 'engram.exe') -DestinationPath $archive
+        $component=$lock.components|Where-Object id -CEQ 'engram'|ConvertTo-Json -Depth 10|ConvertFrom-Json; $component.source.sha256=(Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+        $probe=[pscustomobject]@{Count=0}
+        $downloader=({param($u,$d) Copy-Item $archive $d}).GetNewClosure(); $process=({ $probe.Count++; [pscustomobject]@{ExitCode=0;StdOut=$(if($probe.Count -eq 1){'engram 1.16.2'}else{'engram 1.16.3'});StdErr=''} }).GetNewClosure()
+        $result=Install-CoreComponent -Component $component -KitRoot $root -Downloader $downloader -ProcessInvoker $process
+        $result.Action | Should -Be 'UPDATE_TO_PINNED'
+        (Get-Content -Raw (Join-Path $bin 'engram.exe')) | Should -Be 'new'
     }
 
     It 'verifies checksum before publishing and cleans failed staging' {

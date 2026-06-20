@@ -172,13 +172,18 @@ function Invoke-ConfirmedPrerequisiteInstall {
         [switch]$ConfirmInstall
     )
 
-    if (@($Plan.Items).Count -eq 0) { return [pscustomobject]@{ Status = 'COMPLETED'; Installed = @() } }
+    $installApproved = [bool]$ConfirmInstall
     if ($NonInteractive) {
-        if (-not $ConfirmInstall) { throw 'INSTALL_CONFIRMATION_REQUIRED: NonInteractive requires ConfirmInstall.' }
+        if (-not $installApproved) { throw 'INSTALL_CONFIRMATION_REQUIRED: NonInteractive requires ConfirmInstall.' }
     }
-    elseif ((& $ConfirmationReader) -cne 'INSTALL') {
-        return [pscustomobject]@{ Status = 'CANCELED'; Installed = @() }
+    elseif (-not $installApproved) {
+        $answer = [string](& $ConfirmationReader)
+        if ($answer -cne 'INSTALL') {
+            return [pscustomobject]@{ Status = 'CANCELED'; Installed = @(); InstallApproved = $false }
+        }
+        $installApproved = $true
     }
+    if (@($Plan.Items).Count -eq 0) { return [pscustomobject]@{ Status = 'COMPLETED'; Installed = @(); InstallApproved = $installApproved } }
 
     $verified = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     if ($null -ne $Plan.PSObject.Properties['CompatibleIds']) {
@@ -218,7 +223,7 @@ function Invoke-ConfirmedPrerequisiteInstall {
         if ($id -eq 'node') { $nodeInstalled = $true }
     }
 
-    [pscustomobject]@{ Status = 'COMPLETED'; Installed = @($installed) }
+    [pscustomobject]@{ Status = 'COMPLETED'; Installed = @($installed); InstallApproved = $installApproved }
 }
 
 Export-ModuleMember -Function ConvertFrom-VersionProbeResult, Get-BootstrapPreflight, Resolve-PrerequisitePlan, Invoke-ConfirmedPrerequisiteInstall

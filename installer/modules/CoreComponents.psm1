@@ -34,6 +34,14 @@ function Get-FileSha256Core {
     finally { $sha.Dispose(); $stream.Dispose() }
 }
 
+function Assert-CoreVersion {
+    param([string]$Id,[string]$ExpectedVersion,[AllowNull()][string]$ActualVersion)
+    if ($ActualVersion -cne $ExpectedVersion) {
+        $reported = if ([string]::IsNullOrWhiteSpace($ActualVersion)) { 'unknown' } else { $ActualVersion }
+        throw "COMPONENT_VERSION_MISMATCH:$Id`:expected:$ExpectedVersion`:actual:$reported"
+    }
+}
+
 function Install-CoreComponent {
     [CmdletBinding()]
     param(
@@ -55,21 +63,26 @@ function Install-CoreComponent {
         if (-not [string]::IsNullOrWhiteSpace([string]$existingPath)) {
             $previousVersion = Get-ProcessVersion -FilePath ([string]$existingPath) -Arguments @('--version') -ProcessInvoker $invoke
             if ($previousVersion -ceq [string]$Component.version) {
-                return [pscustomobject][ordered]@{ Id=$id; Version=$previousVersion; Status='REUSED'; Target=[string]$existingPath }
+                return [pscustomobject][ordered]@{ Id=$id; Version=$previousVersion; Status='REUSED'; Action='REUSE_PINNED'; Target=[string]$existingPath }
             }
         }
         try { $result = & $invoke ([string]$Component.install.command) ([string[]]@($Component.install.arguments)) }
         catch { throw "CORE_INSTALL_FAILED:$id`: $($_.Exception.Message)" }
         if ($null -eq $result -or $result.ExitCode -ne 0) { throw "CORE_INSTALL_FAILED:$id`: process failed" }
-        return [pscustomobject][ordered]@{ Id=$id; Version=[string]$Component.version; Status='INSTALLED'; Target="command:$id"; PreviousVersion=$previousVersion }
+        $installedPath = & $resolve $id
+        if ([string]::IsNullOrWhiteSpace([string]$installedPath)) { $installedPath = $id }
+        $installedVersion = Get-ProcessVersion -FilePath ([string]$installedPath) -Arguments @('--version') -ProcessInvoker $invoke
+        Assert-CoreVersion -Id $id -ExpectedVersion ([string]$Component.version) -ActualVersion $installedVersion
+        $action = if ($null -ne $previousVersion) { 'UPDATE_TO_PINNED' } else { 'INSTALL_PINNED' }
+        return [pscustomobject][ordered]@{ Id=$id; Version=$installedVersion; Status='INSTALLED'; Action=$action; Target=[string]$installedPath; PreviousVersion=$previousVersion }
     }
 
     $root = [IO.Path]::GetFullPath($KitRoot)
     $bin = Join-Path $root 'bin'; $target = Join-Path $bin 'engram.exe'
+    $previousVersion = $null
     if (Test-Path -LiteralPath $target) {
-        $existing = Get-ProcessVersion -FilePath $target -Arguments @('version') -ProcessInvoker $invoke
-        if ($existing -ceq [string]$Component.version) { return [pscustomobject][ordered]@{ Id=$id; Version=$existing; Status='REUSED'; Target=$target } }
-        throw "CORE_INSTALL_FAILED:engram: existing version mismatch ($existing)"
+        $previousVersion = Get-ProcessVersion -FilePath $target -Arguments @('version') -ProcessInvoker $invoke
+        if ($previousVersion -ceq [string]$Component.version) { return [pscustomobject][ordered]@{ Id=$id; Version=$previousVersion; Status='REUSED'; Action='REUSE_PINNED'; Target=$target } }
     }
     $stageRoot = Join-Path $root ('.staging/engram-' + [guid]::NewGuid().ToString('N'))
     $archive = Join-Path $stageRoot 'engram.zip'; $extract = Join-Path $stageRoot 'extract'
@@ -84,14 +97,16 @@ function Install-CoreComponent {
         $candidate = Join-Path $extract 'engram.exe'
         if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { throw 'archive missing engram.exe' }
         $candidateVersion = Get-ProcessVersion -FilePath $candidate -Arguments @('version') -ProcessInvoker $invoke
-        if ($candidateVersion -cne [string]$Component.version) { throw "candidate version mismatch ($candidateVersion)" }
+        Assert-CoreVersion -Id $id -ExpectedVersion ([string]$Component.version) -ActualVersion $candidateVersion
         New-Item -ItemType Directory -Path $bin -Force | Out-Null
-        if (Test-Path -LiteralPath $target) { throw 'exclusive target already exists' }
-        [IO.File]::Move($candidate, $target, $false)
-        return [pscustomobject][ordered]@{ Id=$id; Version=$candidateVersion; Status='INSTALLED'; Target=$target; Sha256=$actualHash }
+        [IO.File]::Move($candidate, $target, $true)
+        $installedVersion = Get-ProcessVersion -FilePath $target -Arguments @('version') -ProcessInvoker $invoke
+        Assert-CoreVersion -Id $id -ExpectedVersion ([string]$Component.version) -ActualVersion $installedVersion
+        $action = if ($null -ne $previousVersion) { 'UPDATE_TO_PINNED' } else { 'INSTALL_PINNED' }
+        return [pscustomobject][ordered]@{ Id=$id; Version=$installedVersion; Status='INSTALLED'; Action=$action; Target=$target; PreviousVersion=$previousVersion; Sha256=$actualHash }
     }
     catch {
-        if ($_.Exception.Message -like 'CHECKSUM_MISMATCH:*') { throw $_.Exception }
+        if ($_.Exception.Message -like 'CHECKSUM_MISMATCH:*' -or $_.Exception.Message -like 'COMPONENT_VERSION_MISMATCH:*') { throw $_.Exception }
         throw "CORE_INSTALL_FAILED:engram: $($_.Exception.Message)"
     }
     finally {
