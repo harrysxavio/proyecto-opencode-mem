@@ -41,6 +41,14 @@ $kitFullRoot = [IO.Path]::GetFullPath($KitRoot)
 $receiptRoot = Join-Path $kitFullRoot 'state'
 $receiptPath = Join-Path $receiptRoot 'install-receipt.json'
 $backupRoot = Join-Path $kitFullRoot 'backups'
+$resumeReceipt = $null
+if ($Resume) {
+    if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) { throw "RESUME_RECEIPT_NOT_FOUND:$receiptPath" }
+    try { $resumeReceipt = Read-InstallReceipt -Path $receiptPath -ReceiptRoot $receiptRoot -AllowedRoots @($kitFullRoot) -BackupRoot $backupRoot }
+    catch { throw "RESUME_RECEIPT_INVALID:$($_.Exception.Message)" }
+    if ([string]$resumeReceipt.kitVersion -cne [string]$lock.kitVersion) { throw 'RESUME_RECEIPT_INCOMPATIBLE:kitVersion' }
+    if ([string]$resumeReceipt.provenance.lockDigest -cne $lockDigest) { throw 'RESUME_RECEIPT_INCOMPATIBLE:lockDigest' }
+}
 $core = @($lock.components | Where-Object { $_.id -cin @('opencode','engram','graphify') } | ForEach-Object {
     $copy = $_ | ConvertTo-Json -Depth 30 -Compress | ConvertFrom-Json -Depth 30
     $copy.dependencies = @($copy.dependencies | Where-Object { $_ -cin @('opencode','engram','graphify') })
@@ -76,18 +84,12 @@ if ($PSBoundParameters.ContainsKey('PathRefresher')) { $installArgs.PathRefreshe
 $result = Invoke-ConfirmedPrerequisiteInstall @installArgs
 $coreResult = $null
 if ($result.Status -ceq 'COMPLETED' -and $result.InstallApproved) {
-    $receipt = if ($Resume) {
-        if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) { throw "RESUME_RECEIPT_NOT_FOUND:$receiptPath" }
-        try { Read-InstallReceipt -Path $receiptPath -ReceiptRoot $receiptRoot -AllowedRoots @($kitFullRoot) -BackupRoot $backupRoot }
-        catch { throw "RESUME_RECEIPT_INVALID:$($_.Exception.Message)" }
-    }
+    $receipt = if ($Resume) { $resumeReceipt }
     elseif ($PSBoundParameters.ContainsKey('CoreReceipt')) {
         [void](Assert-InstallReceipt $CoreReceipt)
         $CoreReceipt
     }
     else { New-InstallReceipt -KitVersion ([string]$lock.kitVersion) -LockDigest $lockDigest -SourceCommit 'workspace' }
-    if ($Resume -and [string]$receipt.kitVersion -cne [string]$lock.kitVersion) { throw 'RESUME_RECEIPT_INCOMPATIBLE:kitVersion' }
-    if ($Resume -and [string]$receipt.provenance.lockDigest -cne $lockDigest) { throw 'RESUME_RECEIPT_INCOMPATIBLE:lockDigest' }
     $executor = if ($PSBoundParameters.ContainsKey('CoreExecutor')) { $CoreExecutor } else {
         {
             param($Component,$Phase)

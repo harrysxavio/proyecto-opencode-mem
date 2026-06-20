@@ -55,6 +55,8 @@ function Add-CoreDirectoryLocks {
 function Enter-CoreOwnedDirectory {
     param([string]$Path,[string]$OwnershipRoot,[Collections.Generic.List[object]]$Locks)
     $full=[IO.Path]::GetFullPath($Path)
+    # Reject lexical escapes before finding an anchor or creating any directory.
+    [void](Assert-OwnedPath -Path $full -AllowedRoots @($OwnershipRoot) -AllowMissing)
     if (Test-Path -LiteralPath $full) {
         [void](Assert-ConfigPath -Path $full -Root $OwnershipRoot)
         if (-not (Test-Path -LiteralPath $full -PathType Container)) { throw "CONFIG_PATH_OUTSIDE_ROOT:$full" }
@@ -77,14 +79,40 @@ function Assert-CoreOwnedFilePath {
 
 function Restore-CoreInstallBackup {
     param([object]$Backup,[string]$Target,[string]$OwnershipRoot)
-    [void](Assert-CoreOwnedFilePath -Path $Target -OwnershipRoot $OwnershipRoot -AllowMissing)
+    $targetPath=Assert-CoreOwnedFilePath -Path $Target -OwnershipRoot $OwnershipRoot -AllowMissing
     if ($Backup.existed) {
-        [void](Assert-CoreOwnedFilePath -Path $Backup.backupPath -OwnershipRoot $OwnershipRoot)
-        [IO.File]::Copy([string]$Backup.backupPath,$Target,$true)
-        [void](Assert-CoreOwnedFilePath -Path $Target -OwnershipRoot $OwnershipRoot)
-        [void](Get-ConfigFileIdentity $Target)
+        $backupPath=Assert-CoreOwnedFilePath -Path $Backup.backupPath -OwnershipRoot $OwnershipRoot
+        $targetDirectory=[IO.Path]::GetDirectoryName($targetPath)
+        [void](Assert-CoreOwnedFilePath -Path $targetDirectory -OwnershipRoot $OwnershipRoot)
+        $nonce=[guid]::NewGuid().ToString('N')
+        $restorePath=Assert-CoreOwnedFilePath -Path (Join-Path $targetDirectory ".engram.exe.restore-$nonce") -OwnershipRoot $OwnershipRoot -AllowMissing
+        $replacedPath=Assert-CoreOwnedFilePath -Path (Join-Path $targetDirectory ".engram.exe.replaced-$nonce") -OwnershipRoot $OwnershipRoot -AllowMissing
+        try {
+            $source=[IO.FileStream]::new($backupPath,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+            try {
+                $destination=[IO.FileStream]::new($restorePath,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None,65536,[IO.FileOptions]::WriteThrough)
+                try { $source.CopyTo($destination);$destination.Flush($true) }
+                finally { $destination.Dispose() }
+            }
+            finally { $source.Dispose() }
+            $backupHash=Get-FileSha256Core $backupPath
+            if ((Get-FileSha256Core $restorePath) -cne $backupHash) { throw 'CORE_RESTORE_HASH_MISMATCH:engram' }
+            if (Test-Path -LiteralPath $targetPath -PathType Leaf) {
+                [IO.File]::Replace($restorePath,$targetPath,$replacedPath,$true)
+            }
+            else { [IO.File]::Move($restorePath,$targetPath,$false) }
+            [void](Assert-CoreOwnedFilePath -Path $targetPath -OwnershipRoot $OwnershipRoot)
+            [void](Get-ConfigFileIdentity $targetPath)
+            if ((Get-FileSha256Core $targetPath) -cne $backupHash) { throw 'CORE_RESTORE_HASH_MISMATCH:engram' }
+        }
+        finally {
+            foreach($cleanupPath in @($restorePath,$replacedPath)) {
+                [void](Assert-CoreOwnedFilePath -Path $cleanupPath -OwnershipRoot $OwnershipRoot -AllowMissing)
+                if (Test-Path -LiteralPath $cleanupPath -PathType Leaf) { Remove-Item -LiteralPath $cleanupPath -Force }
+            }
+        }
     }
-    elseif (Test-Path -LiteralPath $Target) { Remove-Item -LiteralPath $Target -Force }
+    elseif (Test-Path -LiteralPath $targetPath) { Remove-Item -LiteralPath $targetPath -Force }
 }
 
 function Install-CoreComponent {

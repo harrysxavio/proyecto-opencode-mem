@@ -82,6 +82,24 @@ Describe 'install command core sequence' {
         Save-InstallReceipt $receipt (Join-Path $state 'install-receipt.json') $state
         { & (Join-Path $repoRoot 'installer/commands/install.ps1') -Root $repoRoot -Json -KitRoot $root -CommandResolver $resolver -NonInteractive -ConfirmInstall -Resume } | Should -Throw 'RESUME_RECEIPT_INCOMPATIBLE:lockDigest*'
     }
+
+    It 'validates every Resume receipt before preflight, confirmation, prerequisite, or core calls' {
+        foreach($case in @('missing','corrupt','incompatible')) {
+            $root=Join-Path $TestDrive "early-resume-$case";$state=Join-Path $root 'state'
+            if($case -ne 'missing'){New-Item -ItemType Directory $state|Out-Null}
+            if($case -eq 'corrupt'){Set-Content (Join-Path $state 'install-receipt.json') '{bad'}
+            if($case -eq 'incompatible'){$receipt=New-InstallReceipt -KitVersion ([string]$lock.kitVersion) -LockDigest ('c'*64) -SourceCommit test;Save-InstallReceipt $receipt (Join-Path $state 'install-receipt.json') $state}
+            $counts=[pscustomobject]@{Resolve=0;Confirm=0;Prerequisite=0;Core=0}
+            $resolver={param($id);$counts.Resolve++;[pscustomobject]@{Present=$false;Usable=$false;Version=$null}}.GetNewClosure()
+            $runner={param($f,$a);$counts.Prerequisite++;[pscustomobject]@{ExitCode=0;StdOut='';StdErr=''}}.GetNewClosure()
+            $confirm={$counts.Confirm++;'INSTALL'}.GetNewClosure();$core={param($c,$p);$counts.Core++;[pscustomobject]@{Success=$true}}.GetNewClosure()
+            { & (Join-Path $repoRoot 'installer/commands/install.ps1') -Root $repoRoot -KitRoot $root -Resume -CommandResolver $resolver -Runner $runner -ConfirmationReader $confirm -CoreExecutor $core } | Should -Throw 'RESUME_RECEIPT_*'
+            $counts.Resolve | Should -Be 0
+            $counts.Confirm | Should -Be 0
+            $counts.Prerequisite | Should -Be 0
+            $counts.Core | Should -Be 0
+        }
+    }
 }
 
 Describe 'pinned core component lock' {
@@ -326,6 +344,33 @@ Describe 'CoreComponents installer' {
         $component=$lock.components|Where-Object id -CEQ 'engram'|ConvertTo-Json -Depth 10|ConvertFrom-Json;$component.source.sha256=(Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
         { Install-CoreComponent -Component $component -KitRoot $root -Downloader {param($u,$d)Copy-Item $archive $d} -ProcessInvoker { [pscustomobject]@{ExitCode=0;StdOut='engram 1.16.3';StdErr=''} } } | Should -Throw '*PATH_OUTSIDE*'
         Test-Path (Join-Path $outside 'engram.exe') | Should -BeFalse
+    }
+
+    It 'rejects nonexistent external receipt and backup roots before creating them' {
+        $payload=Join-Path $TestDrive 'external-root-payload';New-Item -ItemType Directory $payload|Out-Null;Set-Content (Join-Path $payload 'engram.exe') new
+        $archive=Join-Path $TestDrive 'external-root.zip';Compress-Archive (Join-Path $payload 'engram.exe') $archive
+        $component=$lock.components|Where-Object id -CEQ 'engram'|ConvertTo-Json -Depth 10|ConvertFrom-Json;$component.source.sha256=(Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+        foreach($kind in @('ReceiptRoot','BackupRoot')){
+            $root=Join-Path $TestDrive "external-kit-$kind";$outside=Join-Path $TestDrive "outside-$kind"
+            $installParameters=@{Component=$component;KitRoot=$root;Downloader={param($u,$d)Copy-Item $archive $d};ProcessInvoker={ [pscustomobject]@{ExitCode=0;StdOut='engram 1.16.3';StdErr=''} }}
+            $installParameters[$kind]=$outside
+            { Install-CoreComponent @installParameters } | Should -Throw '*PATH_OUTSIDE*'
+            Test-Path $outside | Should -BeFalse
+        }
+    }
+
+    It 'keeps the persisted backup and receipt recoverable when atomic restore cannot replace the target' {
+        $root=Join-Path $TestDrive 'restore-failure';$bin=Join-Path $root bin;New-Item -ItemType Directory $bin|Out-Null;$target=Join-Path $bin 'engram.exe';Set-Content $target old -NoNewline
+        $payload=Join-Path $TestDrive 'restore-failure-payload';New-Item -ItemType Directory $payload|Out-Null;Set-Content (Join-Path $payload 'engram.exe') new -NoNewline;$archive=Join-Path $TestDrive 'restore-failure.zip';Compress-Archive (Join-Path $payload 'engram.exe') $archive
+        $component=$lock.components|Where-Object id -CEQ 'engram'|ConvertTo-Json -Depth 10|ConvertFrom-Json;$component.source.sha256=(Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant();$probe=[pscustomobject]@{Count=0;Lock=$null}
+        $process={param($f,$a);$probe.Count++;if($probe.Count -eq 3){$probe.Lock=[IO.FileStream]::new($target,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)};[pscustomobject]@{ExitCode=0;StdOut=$(if($probe.Count -eq 1){'engram 1.16.2'}elseif($probe.Count -eq 2){'engram 1.16.3'}else{'engram 1.16.2'});StdErr=''}}.GetNewClosure()
+        try { { Install-CoreComponent -Component $component -KitRoot $root -Downloader {param($u,$d)Copy-Item $archive $d} -ProcessInvoker $process } | Should -Throw 'CORE_ROLLBACK_FAILED:engram*' }
+        finally { if($null -ne $probe.Lock){$probe.Lock.Dispose()} }
+        $receipt=Get-Content -Raw (Join-Path $root 'state/install-receipt.json')|ConvertFrom-Json -Depth 20
+        $receipt.backups[0].existed | Should -BeTrue
+        (Get-Content -Raw $receipt.backups[0].backupPath) | Should -Be 'old'
+        (Get-Content -Raw $target) | Should -Be 'new'
+        @(Get-ChildItem $bin -Filter '*.restore-*').Count | Should -Be 0
     }
 
     It 'verifies checksum before publishing and cleans failed staging' {
